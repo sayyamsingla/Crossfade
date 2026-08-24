@@ -1,0 +1,25 @@
+### macOS ###
+.DS_Store
+
+### Backend (Maven / Java / IntelliJ) ###
+crossfade-backend/target/
+crossfade-backend/.idea/
+crossfade-backend/.mvn/wrapper/maven-wrapper.jar
+crossfade-backend/*.iml
+crossfade-backend/*.iws
+crossfade-backend/*.ipr
+crossfade-backend/.classpath
+crossfade-backend/.project
+crossfade-backend/.settings/
+crossfade-backend/.factorypath
+crossfade-backend/.apt_generated
+crossfade-backend/.springBeans
+crossfade-backend/.sts4-cache
+crossfade-backend/HELP.md
+
+### Frontend (Node) ###
+crossfade-frontend/node_modules/
+crossfade-frontend/npm-debug.log*
+
+### Editors ###
+.vscode/

@@ -1,0 +1,13 @@
+{
+  "name": "crossfade-frontend",
+  "version": "1.0.0",
+  "description": "Crossfade — frontend only. Talks to a Spring Boot backend at http://localhost:8080.",
+  "private": true,
+  "scripts": {
+    "start": "http-server . -p 5173 -c-1",
+    "dev": "http-server . -p 5173 -c-1 -o"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Crossfade</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="topnav">
+  <div class="topnav-inner">
+    <div class="brand"><div class="brand-mark">C</div><div class="brand-name">Crossfade</div></div>
+    <div class="nav-links">
+      <button class="nav-link active" data-tab="profile">Profile</button>
+      <button class="nav-link" data-tab="feed">Feed</button>
+      <button class="nav-link" data-tab="friends">Friends</button>
+      <button class="nav-link" data-tab="compat">Compatibility</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-btn" id="themeToggle">Light mode</button>
+      <div class="id-chip" id="idChip">?</div>
+    </div>
+  </div>
+</div>
+
+<div class="error-banner" id="errorBanner">
+  <span class="banner-text"></span>
+  <button id="retryBtn">Retry</button>
+</div>
+
+<!-- ================= PROFILE ================= -->
+<div class="page active" id="page-profile">
+  <div class="viewing-banner" id="viewingBanner">
+    <span id="viewingText"></span>
+    <button id="backToMeBtn" type="button">← Back to your profile</button>
+  </div>
+  <div class="hero">
+    <div class="hero-avatar" id="heroAvatarWrap"></div>
+    <div>
+      <p class="hero-kicker">Profile</p>
+      <p class="hero-name" id="heroName">Loading…</p>
+      <div class="hero-meta">
+        <b id="heroFollowers">–</b> followers &nbsp;·&nbsp;
+        <b id="heroFollowing">–</b> following &nbsp;·&nbsp;
+        top genre <b id="heroTopGenre">–</b>
+      </div>
+      <p class="hero-bio" id="heroBio"></p>
+      <button class="compare-btn" id="compareBtn" type="button">Compare taste →</button>
+    </div>
+  </div>
+
+  <div class="now-playing-strip" id="nowPlayingStrip"></div>
+
+  <section class="block">
+    <div class="section-head"><h2 class="section-title">Top tracks</h2><span class="section-sub">Last 4 weeks</span></div>
+    <div id="tracksList"><p class="empty-note">Loading…</p></div>
+  </section>
+
+  <section class="block">
+    <div class="section-head"><h2 class="section-title">Top artists</h2><span class="section-sub">Last 4 weeks</span></div>
+    <div class="artist-grid" id="artistGrid"><p class="empty-note">Loading…</p></div>
+  </section>
+
+  <section class="block">
+    <div class="section-head"><h2 class="section-title">Top genres</h2></div>
+    <div class="genre-wrap" id="genreList"><p class="empty-note">Loading…</p></div>
+  </section>
+
+  <section class="block">
+    <div class="section-head"><h2 class="section-title">Playlists</h2></div>
+    <div class="playlist-grid" id="playlistGrid"><p class="empty-note">Loading…</p></div>
+  </section>
+
+  <section class="block">
+    <div class="section-head"><h2 class="section-title">Comments</h2></div>
+    <div id="commentList"><p class="empty-note">Loading…</p></div>
+    <form class="comment-form" id="commentForm">
+      <textarea id="commentInput" placeholder="Leave a comment…" required></textarea>
+      <button type="submit" id="commentSubmitBtn">Post</button>
+    </form>
+  </section>
+</div>
+
+<!-- ================= FEED ================= -->
+<div class="page" id="page-feed">
+  <section class="block" style="border-top:none;padding-top:30px;">
+    <div class="section-head"><h2 class="section-title">Activity</h2><span class="section-sub">From people you follow</span></div>
+    <div id="feedList"><p class="empty-note">Loading…</p></div>
+  </section>
+</div>
+
+<!-- ================= FRIENDS ================= -->
+<div class="page" id="page-friends">
+  <section class="block" style="border-top:none;padding-top:30px;">
+    <div class="section-head"><h2 class="section-title">Friends</h2></div>
+    <form class="search-row" id="searchForm">
+      <input type="text" id="searchInput" placeholder="Find people by name…" autocomplete="off" />
+      <button type="submit">Search</button>
+    </form>
+    <div class="section-head"><h2 class="section-title" id="peopleHeading" style="font-size:14px;">Your friends</h2></div>
+    <div class="person-grid" id="peopleGrid"><p class="empty-note">Loading…</p></div>
+  </section>
+</div>
+
+<!-- ================= COMPATIBILITY ================= -->
+<div class="page" id="page-compat">
+  <section class="block" style="border-top:none;padding-top:30px;">
+    <div class="section-head"><h2 class="section-title">Compatibility</h2></div>
+    <div class="compat-picker">Compare <select id="compatSelect"><option>Loading…</option></select> with you</div>
+
+    <div id="compatBody">
+      <div class="duo-row">
+        <div class="a" id="duoMe"></div>
+        <div class="duo-x">×</div>
+        <div class="a" id="duoOther"></div>
+      </div>
+      <div class="compat-hero">
+        <div class="compat-value mono" id="compatValue">–</div>
+        <p class="compat-caption" id="compatCaption"></p>
+      </div>
+
+      <div class="compat-grid">
+        <div>
+          <div class="section-head"><h2 class="section-title" style="font-size:13px;">Shared artists</h2></div>
+          <div class="chip-row" id="sharedArtists"></div>
+        </div>
+        <div>
+          <div class="section-head"><h2 class="section-title" style="font-size:13px;">Shared genres</h2></div>
+          <div class="chip-row" id="sharedGenres"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
