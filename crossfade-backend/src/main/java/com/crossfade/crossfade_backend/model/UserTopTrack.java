@@ -20,6 +20,7 @@ public class UserTopTrack {
     @JoinColumn(name = "track_id")
     private Track track;
 
+    @Column(name = "`rank`")
     private Integer rank;
     private Integer playCount;
 

@@ -15,4 +15,8 @@ public class Playlist {
     private String title;
     private String coverUrl;
 
+    @ManyToOne
+    @JoinColumn(name = "owner_id")
+    private User owner;
+
 }

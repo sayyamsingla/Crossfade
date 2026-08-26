@@ -48,7 +48,10 @@ function resolveImageUrl(url) {
   return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
-const Api = {
+// TEMP: while USE_MOCK_DATA is on (see js/config.js), every Api method below
+// delegates to js/mock-data.js instead of hitting the network. Delete both
+// files (and this check) once the real backend is ready.
+const RealApi = {
   // ---- profile -------------------------------------------------------
   getProfile(userId) {
     return apiFetch(`/users/${userId}`);
@@ -67,6 +70,15 @@ const Api = {
   },
   getPlaylists(userId) {
     return apiFetch(`/users/${userId}/playlists`);
+  },
+  getPlaylistTracks(playlistId) {
+    return apiFetch(`/playlists/${playlistId}/tracks`);
+  },
+  likePlaylist(playlistId) {
+    return apiFetch(`/playlists/${playlistId}/like`, { method: 'POST' });
+  },
+  unlikePlaylist(playlistId) {
+    return apiFetch(`/playlists/${playlistId}/like`, { method: 'DELETE' });
   },
 
   // ---- comments (profile wall) ---------------------------------------
@@ -100,10 +112,18 @@ const Api = {
   searchUsers(query) {
     return apiFetch(`/users/search?q=${encodeURIComponent(query)}`);
   },
+  followUser(userId) {
+    return apiFetch(`/users/${userId}/follow`, { method: 'POST' });
+  },
+  unfollowUser(userId) {
+    return apiFetch(`/users/${userId}/follow`, { method: 'DELETE' });
+  },
   getCompatibility(userId, withUserId) {
     return apiFetch(`/compatibility?userId=${userId}&withUserId=${withUserId}`);
   },
 };
+
+const Api = window.CROSSFADE_CONFIG.USE_MOCK_DATA ? window.MockApi : RealApi;
 
 window.Api = Api;
 window.ApiError = ApiError;

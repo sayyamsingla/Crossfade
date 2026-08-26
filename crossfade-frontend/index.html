@@ -4,30 +4,38 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Crossfade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-<div class="topnav">
-  <div class="topnav-inner">
-    <div class="brand"><div class="brand-mark">C</div><div class="brand-name">Crossfade</div></div>
-    <div class="nav-links">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 20" aria-hidden="true">
+        <path class="fade-a" d="M0 16 C 8 16, 10 4, 18 4 S 28 16, 32 16" />
+        <path class="fade-b" d="M0 4 C 8 4, 10 16, 18 16 S 28 4, 32 4" />
+      </svg>
+      <div class="brand-name">Crossfade</div>
+    </div>
+    <nav class="nav-links">
       <button class="nav-link active" data-tab="profile">Profile</button>
       <button class="nav-link" data-tab="feed">Feed</button>
       <button class="nav-link" data-tab="friends">Friends</button>
       <button class="nav-link" data-tab="compat">Compatibility</button>
-    </div>
+    </nav>
     <div class="nav-right">
-      <button class="theme-btn" id="themeToggle">Light mode</button>
       <div class="id-chip" id="idChip">?</div>
     </div>
-  </div>
-</div>
+  </aside>
 
-<div class="error-banner" id="errorBanner">
-  <span class="banner-text"></span>
-  <button id="retryBtn">Retry</button>
-</div>
+  <div class="main-col">
+    <div class="error-banner" id="errorBanner">
+      <span class="banner-text"></span>
+      <button id="retryBtn">Retry</button>
+    </div>
 
 <!-- ================= PROFILE ================= -->
 <div class="page active" id="page-profile">
@@ -74,11 +82,14 @@
 
   <section class="block">
     <div class="section-head"><h2 class="section-title">Comments</h2></div>
-    <div id="commentList"><p class="empty-note">Loading…</p></div>
     <form class="comment-form" id="commentForm">
-      <textarea id="commentInput" placeholder="Leave a comment…" required></textarea>
-      <button type="submit" id="commentSubmitBtn">Post</button>
+      <div class="c-badge" id="commentFormAvatar"></div>
+      <div class="comment-form-body">
+        <textarea id="commentInput" placeholder="Leave a comment…" rows="1" required></textarea>
+        <button type="submit" id="commentSubmitBtn">Post</button>
+      </div>
     </form>
+    <div id="commentList"><p class="empty-note">Loading…</p></div>
   </section>
 </div>
 
@@ -94,29 +105,59 @@
 <div class="page" id="page-friends">
   <section class="block" style="border-top:none;padding-top:30px;">
     <div class="section-head"><h2 class="section-title">Friends</h2></div>
-    <form class="search-row" id="searchForm">
+    <div class="search-row">
       <input type="text" id="searchInput" placeholder="Find people by name…" autocomplete="off" />
-      <button type="submit">Search</button>
-    </form>
+    </div>
     <div class="section-head"><h2 class="section-title" id="peopleHeading" style="font-size:14px;">Your friends</h2></div>
     <div class="person-grid" id="peopleGrid"><p class="empty-note">Loading…</p></div>
   </section>
 </div>
 
+<!-- ================= PLAYLIST DETAIL ================= -->
+<div class="page" id="page-playlist">
+  <button class="back-link" id="playlistBackBtn" type="button">
+    <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+    Back
+  </button>
+  <div class="playlist-hero">
+    <div class="playlist-hero-cover" id="playlistHeroCover"></div>
+    <div>
+      <p class="playlist-hero-kicker">Playlist</p>
+      <h1 class="playlist-hero-title" id="playlistHeroTitle">–</h1>
+      <p class="playlist-hero-meta mono" id="playlistHeroMeta"></p>
+    </div>
+  </div>
+  <div class="playlist-tracklist" id="playlistTracklist"><p class="empty-note">Loading…</p></div>
+</div>
+
 <!-- ================= COMPATIBILITY ================= -->
 <div class="page" id="page-compat">
   <section class="block" style="border-top:none;padding-top:30px;">
-    <div class="section-head"><h2 class="section-title">Compatibility</h2></div>
-    <div class="compat-picker">Compare <select id="compatSelect"><option>Loading…</option></select> with you</div>
+    <div class="section-head"><h2 class="section-title">Compatibility</h2><span class="section-sub">Compare with</span></div>
+    <div class="compat-picker-row" id="compatPickerRow"><p class="empty-note">Loading…</p></div>
 
     <div id="compatBody">
       <div class="duo-row">
-        <div class="a" id="duoMe"></div>
-        <div class="duo-x">×</div>
-        <div class="a" id="duoOther"></div>
+        <div class="duo-person a">
+          <div class="duo-avatar" id="duoMe"></div>
+          <div class="duo-label" id="duoMeLabel">You</div>
+        </div>
+        <div class="fader-wrap">
+          <div class="fader-rail">
+            <span class="fader-tick" style="left:50%"></span>
+            <div class="fader-fill" id="faderFill"></div>
+            <div class="fader-cap" id="faderCap"></div>
+          </div>
+          <div class="fader-scale"><span id="faderScaleA">A</span><span id="faderScaleB">B</span></div>
+        </div>
+        <div class="duo-person b">
+          <div class="duo-avatar" id="duoOther"></div>
+          <div class="duo-label" id="duoOtherLabel">Them</div>
+        </div>
       </div>
       <div class="compat-hero">
-        <div class="compat-value mono" id="compatValue">–</div>
+        <div class="compat-value"><span id="compatValue">–</span><span class="compat-value-pct">%</span></div>
+        <div class="compat-value-label">taste match</div>
         <p class="compat-caption" id="compatCaption"></p>
       </div>
 
@@ -133,9 +174,12 @@
     </div>
   </section>
 </div>
+  </div>
+</div>
 
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/mock-data.js"></script>
 <script src="js/api.js"></script>
 <script src="js/app.js"></script>
 </body>

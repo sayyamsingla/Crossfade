@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 public class Track {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private Long id;
     private String title;
     private String coverUrl;
 

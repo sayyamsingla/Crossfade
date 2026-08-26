@@ -5,15 +5,6 @@
 
 const CURRENT_USER_ID = window.CROSSFADE_CONFIG.CURRENT_USER_ID;
 
-const ICONS = {
-  TRACK_ADDED: '<svg class="icon" viewBox="0 0 24 24"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>',
-  FOLLOWED: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-6 8-6s8 2 8 6"/></svg>',
-  COMMENTED: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-3.3-6.5L21 4l-1 4.2A8 8 0 0 1 21 12Z"/></svg>',
-  TOP_TRACK: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg>',
-  LIKED_PLAYLIST: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9Z"/></svg>',
-  NOW_LISTENING: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="2" y="14" width="5" height="7" rx="1.5"/><rect x="17" y="14" width="5" height="7" rx="1.5"/></svg>',
-};
-
 let currentProfile = null;      // your own profile (CURRENT_USER_ID) — cached once, used for compat "you" avatar
 let viewedUserId = CURRENT_USER_ID; // whose profile the Profile tab is currently showing
 let peopleCache = {};           // userId -> { userId, displayName, avatarUrl, topGenre } — filled in from every source (profile loads, friends list, search)
@@ -23,11 +14,15 @@ let friendsLoaded = false;
 
 // ---------------------------------------------------------------------- init
 document.addEventListener('DOMContentLoaded', () => {
-  initTheme();
   initTabs();
   document.getElementById('retryBtn').addEventListener('click', () => loadProfilePage());
   document.getElementById('commentForm').addEventListener('submit', handleCommentSubmit);
-  document.getElementById('searchForm').addEventListener('submit', handleSearchSubmit);
+  document.getElementById('searchInput').addEventListener('input', handleSearchInput);
+  const commentInput = document.getElementById('commentInput');
+  commentInput.addEventListener('input', () => {
+    commentInput.style.height = 'auto';
+    commentInput.style.height = commentInput.scrollHeight + 'px';
+  });
   document.getElementById('backToMeBtn').addEventListener('click', () => {
     viewedUserId = CURRENT_USER_ID;
     loadProfilePage();
@@ -36,17 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const person = peopleCache[viewedUserId];
     goToCompatWith(viewedUserId, person ? person.displayName : 'them');
   });
+  document.getElementById('playlistBackBtn').addEventListener('click', closePlaylistPage);
   loadProfilePage();
 });
-
-function initTheme() {
-  const btn = document.getElementById('themeToggle');
-  btn.addEventListener('click', () => {
-    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    document.documentElement.setAttribute('data-theme', isLight ? 'dark' : 'light');
-    btn.textContent = isLight ? 'Light mode' : 'Dark mode';
-  });
-}
 
 function initTabs() {
   document.querySelectorAll('.nav-link').forEach(btn => {
@@ -121,6 +108,10 @@ async function loadProfilePage() {
   loadSection(() => Api.getTopGenres(userId).then(renderGenres), 'genreList');
   loadSection(() => Api.getPlaylists(userId).then(renderPlaylists), 'playlistGrid');
   loadSection(() => Api.getComments(userId).then(renderComments), 'commentList');
+
+  if (currentProfile) {
+    document.getElementById('commentFormAvatar').innerHTML = mediaTag({ url: currentProfile.avatarUrl, name: currentProfile.displayName, seed: currentProfile.id });
+  }
 }
 
 function renderHero(p) {
@@ -146,17 +137,18 @@ function renderNowPlaying(data) {
   if (!data || !data.playing || !data.track) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
   el.innerHTML = `
-    <div class="eq"><span></span><span></span><span></span></div>
-    <div class="np-cover">${mediaTag({ url: data.track.coverUrl, name: data.track.title, seed: data.track.title })}</div>
-    <div class="np-info"><b>${escapeHtml(data.track.title)}</b> <span class="sub">· ${escapeHtml(data.track.artist)}</span></div>
-    <div class="np-tag">Listening now</div>
+    <svg class="np-note" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <div class="np-body">
+      <div class="np-label">Now playing</div>
+      <div class="np-title">${escapeHtml(data.track.title)}</div>
+      <div class="np-artist">${escapeHtml(data.track.artist)}</div>
+    </div>
   `;
 }
 
 function renderTracks(tracks) {
   const el = document.getElementById('tracksList');
   if (!tracks || !tracks.length) { el.innerHTML = '<p class="empty-note">No top tracks yet.</p>'; return; }
-  const max = Math.max(...tracks.map(t => t.playCount || 0), 1);
   el.innerHTML = tracks.map(t => `
     <div class="track-row">
       <div class="track-rank mono">${t.rank}</div>
@@ -165,8 +157,6 @@ function renderTracks(tracks) {
         <div class="track-name">${escapeHtml(t.title)}</div>
         <div class="track-artist">${escapeHtml(t.artist)}</div>
       </div>
-      <div class="track-bar"><div class="track-bar-fill" style="width:${((t.playCount || 0) / max * 100).toFixed(0)}%"></div></div>
-      <div class="track-plays mono">${t.playCount ?? 0} plays</div>
     </div>
   `).join('');
 }
@@ -176,11 +166,8 @@ function renderArtists(artists) {
   if (!artists || !artists.length) { el.innerHTML = '<p class="empty-note">No top artists yet.</p>'; return; }
   el.innerHTML = artists.map(a => `
     <div class="artist-card">
-      <div class="artist-swatch">
-        ${mediaTag({ url: a.imageUrl, name: a.name, seed: a.artistId })}
-        <span class="rk">${a.rank}</span>
-      </div>
-      <div class="artist-name">${escapeHtml(a.name)}</div>
+      <div class="artist-swatch">${mediaTag({ url: a.imageUrl, name: a.name, seed: a.artistId })}</div>
+      <div class="artist-name"><span class="rk mono">${a.rank}</span>${escapeHtml(a.name)}</div>
     </div>
   `).join('');
 }
@@ -188,9 +175,8 @@ function renderArtists(artists) {
 function renderGenres(genres) {
   const el = document.getElementById('genreList');
   if (!genres || !genres.length) { el.innerHTML = '<p class="empty-note">No genre data yet.</p>'; return; }
-  el.innerHTML = genres.map((g, i) => `
-    <div class="genre-pill">
-      <span class="dot" style="background:var(--accent);opacity:${Math.max(1 - i * 0.15, 0.35)}"></span>
+  el.innerHTML = genres.map(g => `
+    <div class="genre-row">
       <span class="name">${escapeHtml(g.name)}</span>
       <span class="pct mono">${g.percentage}%</span>
     </div>
@@ -200,17 +186,84 @@ function renderGenres(genres) {
 function renderPlaylists(playlists) {
   const el = document.getElementById('playlistGrid');
   if (!playlists || !playlists.length) { el.innerHTML = '<p class="empty-note">No playlists yet.</p>'; return; }
-  el.innerHTML = playlists.map(p => `
-    <div>
-      <div class="playlist-cover">
-        ${mediaTag({ url: p.coverUrl, name: p.title, seed: p.playlistId })}
-        <span class="count mono">${p.trackCount}</span>
+  el.innerHTML = playlists.map(p => {
+    playlistCache[p.playlistId] = p;
+    return `
+    <div class="playlist-card" data-playlist-id="${p.playlistId}">
+      <button class="playlist-cover-btn" onclick="openPlaylist(${p.playlistId})" aria-label="Open ${escapeHtml(p.title)}">
+        <div class="playlist-cover">${mediaTag({ url: p.coverUrl, name: p.title, seed: p.playlistId })}</div>
+      </button>
+      <div class="playlist-row">
+        <div class="clickable-name" onclick="openPlaylist(${p.playlistId})">
+          <p class="playlist-title">${escapeHtml(p.title)}</p>
+          <p class="playlist-sub mono">${p.trackCount} tracks</p>
+        </div>
+        <button class="playlist-like-btn ${p.likedByCurrentUser ? 'liked' : ''}" data-liked="${!!p.likedByCurrentUser}"
+                onclick="event.stopPropagation(); togglePlaylistLike(${p.playlistId}, this.dataset.liked === 'true')" title="Like this playlist">
+          <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9Z"/></svg>
+          <span class="like-count">${p.likeCount ?? 0}</span>
+        </button>
       </div>
-      <p class="playlist-title">${escapeHtml(p.title)}</p>
-      <p class="playlist-sub mono">${p.trackCount} tracks</p>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
+
+const playlistCache = {};
+let tabBeforePlaylist = 'profile';
+
+async function openPlaylist(playlistId) {
+  const p = playlistCache[playlistId];
+  if (!p) return;
+  const activeTab = document.querySelector('.nav-link.active');
+  tabBeforePlaylist = activeTab ? activeTab.dataset.tab : 'profile';
+  document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(pg => pg.classList.toggle('active', pg.id === 'page-playlist'));
+
+  document.getElementById('playlistHeroCover').innerHTML = mediaTag({ url: p.coverUrl, name: p.title, seed: p.playlistId });
+  document.getElementById('playlistHeroTitle').textContent = p.title;
+  document.getElementById('playlistHeroMeta').textContent = `${p.trackCount} tracks`;
+  const tracksEl = document.getElementById('playlistTracklist');
+  tracksEl.innerHTML = '<p class="empty-note">Loading…</p>';
+  window.scrollTo(0, 0);
+  try {
+    const tracks = await Api.getPlaylistTracks(playlistId);
+    if (!tracks.length) { tracksEl.innerHTML = '<p class="empty-note">No tracks to show yet.</p>'; return; }
+    tracksEl.innerHTML = tracks.map((t, i) => `
+      <div class="pl-track-row">
+        <span class="pl-track-rank mono">${i + 1}</span>
+        <div class="pl-track-cover">${mediaTag({ url: t.coverUrl, name: t.title, seed: t.trackId })}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="pl-track-title">${escapeHtml(t.title)}</div>
+          <div class="pl-track-artist">${escapeHtml(t.artist)}</div>
+        </div>
+        ${t.duration ? `<span class="pl-track-duration mono">${escapeHtml(t.duration)}</span>` : ''}
+      </div>
+    `).join('');
+  } catch (err) {
+    tracksEl.innerHTML = `<p class="error-inline">${escapeHtml(err.message)}</p>`;
+  }
+}
+window.openPlaylist = openPlaylist;
+
+function closePlaylistPage() {
+  activateTab(tabBeforePlaylist);
+}
+
+async function togglePlaylistLike(playlistId, liked) {
+  try {
+    const res = liked ? await Api.unlikePlaylist(playlistId) : await Api.likePlaylist(playlistId);
+    const card = document.querySelector(`.playlist-card[data-playlist-id="${playlistId}"]`);
+    if (!card) return;
+    const btn = card.querySelector('.playlist-like-btn');
+    btn.dataset.liked = String(res.likedByCurrentUser);
+    btn.classList.toggle('liked', res.likedByCurrentUser);
+    btn.querySelector('.like-count').textContent = res.likeCount;
+  } catch (err) {
+    alert('Could not update like — ' + err.message);
+  }
+}
+window.togglePlaylistLike = togglePlaylistLike;
 
 function renderComments(comments) {
   const el = document.getElementById('commentList');
@@ -229,7 +282,8 @@ function renderComments(comments) {
         <div class="comment-actions">
           <button class="like-btn ${c.likedByCurrentUser ? 'liked' : ''}" data-liked="${!!c.likedByCurrentUser}"
                   onclick="toggleLike(${c.commentId}, this.dataset.liked === 'true')">
-            ♥ <span class="like-count">${c.likeCount ?? 0}</span>
+            <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9Z"/></svg>
+            <span class="like-count">${c.likeCount ?? 0}</span>
           </button>
         </div>
       </div>
@@ -283,15 +337,16 @@ function renderFeed(items) {
   if (!items || !items.length) { el.innerHTML = '<p class="empty-note">No activity yet.</p>'; return; }
   el.innerHTML = items.map(item => {
     peopleCache[item.actor.userId] = item.actor;
+    const isQuote = item.type === 'COMMENTED' && item.subtitle;
     return `
     <div class="feed-item">
-      <div class="feed-icon">${ICONS[item.type] || ICONS.TRACK_ADDED}</div>
-      <div style="flex:1;">
+      <div class="feed-avatar clickable-name" onclick="viewProfile(${item.actor.userId})">${mediaTag({ url: item.actor.avatarUrl, name: item.actor.displayName, seed: item.actor.userId })}</div>
+      <div class="feed-body">
         <div class="feed-row-top">
           <div class="feed-text"><b class="clickable-name" onclick="viewProfile(${item.actor.userId})">${escapeHtml(item.actor.displayName)}</b> ${escapeHtml(item.verb)} <b>${escapeHtml(item.target)}</b></div>
           <div class="feed-time">${formatRelativeTime(item.createdAt)}</div>
         </div>
-        ${item.subtitle ? `<div class="feed-sub">${escapeHtml(item.subtitle)}</div>` : ''}
+        ${item.subtitle ? `<div class="feed-sub ${isQuote ? 'is-quote' : ''}">${escapeHtml(item.subtitle)}</div>` : ''}
       </div>
     </div>
   `;
@@ -317,76 +372,128 @@ async function loadFriendsPage() {
   friendsLoaded = true;
 }
 
-function renderPeopleGrid(people) {
+function renderPeopleGrid(people, { showFollow = false } = {}) {
   const el = document.getElementById('peopleGrid');
   if (!people || !people.length) { el.innerHTML = '<p class="empty-note">Nobody here yet.</p>'; return; }
-  el.innerHTML = people.map(u => `
-    <div class="person-card" onclick="viewProfile(${u.userId})">
-      <div class="person-avatar">${mediaTag({ url: u.avatarUrl, name: u.displayName, seed: u.userId })}</div>
-      <div class="person-name">${escapeHtml(u.displayName)}</div>
-      ${u.topGenre ? `<div class="person-sub">${escapeHtml(u.topGenre)}</div>` : ''}
+  const friendIds = new Set((friendsListCache || []).map(u => u.userId));
+  el.innerHTML = people.map(u => {
+    const isFriend = friendIds.has(u.userId);
+    return `
+    <div class="person-card">
+      <div class="clickable-area" onclick="viewProfile(${u.userId})">
+        <div class="person-avatar">${mediaTag({ url: u.avatarUrl, name: u.displayName, seed: u.userId })}</div>
+        <div class="person-name">${escapeHtml(u.displayName)}</div>
+        ${u.topGenre ? `<div class="person-sub">${escapeHtml(u.topGenre)}</div>` : ''}
+      </div>
+      ${showFollow ? `<button class="follow-btn ${isFriend ? 'following' : ''}" onclick="event.stopPropagation(); toggleFollow(${u.userId}, this)">${isFriend ? 'Following' : 'Follow'}</button>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
-async function handleSearchSubmit(e) {
-  e.preventDefault();
-  const input = document.getElementById('searchInput');
-  const query = input.value.trim();
+async function toggleFollow(userId, btn) {
+  const isFollowing = btn.classList.contains('following');
+  btn.disabled = true;
+  try {
+    if (isFollowing) {
+      await Api.unfollowUser(userId);
+      friendsListCache = (friendsListCache || []).filter(u => u.userId !== userId);
+      btn.classList.remove('following');
+      btn.textContent = 'Follow';
+    } else {
+      await Api.followUser(userId);
+      const person = peopleCache[userId];
+      if (person && !(friendsListCache || []).some(u => u.userId === userId)) {
+        (friendsListCache = friendsListCache || []).push(person);
+      }
+      btn.classList.add('following');
+      btn.textContent = 'Following';
+    }
+  } catch (err) {
+    alert('Could not update follow — ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+window.toggleFollow = toggleFollow;
+
+let searchDebounce = null;
+function handleSearchInput(e) {
+  const query = e.target.value.trim();
+  clearTimeout(searchDebounce);
   if (!query) {
     document.getElementById('peopleHeading').textContent = 'Your friends';
-    renderPeopleGrid(await getFriendsList());
+    getFriendsList().then(friends => renderPeopleGrid(friends));
     return;
   }
-  await loadSection(async () => {
-    const results = (await Api.searchUsers(query)).filter(u => u.userId !== CURRENT_USER_ID);
-    results.forEach(u => { peopleCache[u.userId] = u; });
-    document.getElementById('peopleHeading').textContent = `Search results for "${query}"`;
-    renderPeopleGrid(results);
-  }, 'peopleGrid');
+  searchDebounce = setTimeout(async () => {
+    await loadSection(async () => {
+      const results = (await Api.searchUsers(query)).filter(u => u.userId !== CURRENT_USER_ID);
+      results.forEach(u => { peopleCache[u.userId] = u; });
+      document.getElementById('peopleHeading').textContent = `Search results for "${query}"`;
+      renderPeopleGrid(results, { showFollow: true });
+    }, 'peopleGrid');
+  }, 220);
 }
 
 // --------------------------------------------------------------- compatibility
+let compatPickerLoaded = false;
+let compatSelectedId = null;
+
 async function loadCompatPage() {
-  const select = document.getElementById('compatSelect');
-  if (!select.dataset.loaded) {
+  const row = document.getElementById('compatPickerRow');
+  if (!compatPickerLoaded) {
     try {
       const friends = await getFriendsList();
-      populateCompatSelect(friends);
-      select.dataset.loaded = '1';
+      populateCompatPicker(friends);
+      compatPickerLoaded = true;
     } catch (err) {
       document.getElementById('compatBody').innerHTML = `<p class="error-inline">${escapeHtml(err.message)}</p>`;
       return;
     }
   }
-  if (select.value) loadCompat(select.value);
+  if (compatSelectedId) loadCompat(compatSelectedId);
 }
 
-function populateCompatSelect(friends) {
-  const select = document.getElementById('compatSelect');
-  if (!friends.length) { select.innerHTML = '<option>No friends yet</option>'; return; }
-  select.innerHTML = friends.map(u => `<option value="${u.userId}">${escapeHtml(u.displayName)}</option>`).join('');
-  select.addEventListener('change', () => loadCompat(select.value));
+function populateCompatPicker(friends) {
+  const row = document.getElementById('compatPickerRow');
+  if (!friends.length) { row.innerHTML = '<p class="empty-note">Follow someone to compare taste.</p>'; return; }
+  row.innerHTML = friends.map(u => `
+    <button type="button" class="compat-pick ${u.userId === compatSelectedId ? 'active' : ''}" data-user-id="${u.userId}" onclick="selectCompatWith(${u.userId})">
+      <span class="compat-pick-avatar">${mediaTag({ url: u.avatarUrl, name: u.displayName, seed: u.userId })}</span>
+      <span class="compat-pick-name">${escapeHtml(u.displayName)}</span>
+    </button>
+  `).join('');
+  if (!compatSelectedId) compatSelectedId = friends[0].userId;
 }
 
-/** Ensures `userId` exists as an option in the Compatibility picker even if
- *  they're not a friend yet (e.g. found via search), then selects them. */
+function selectCompatWith(userId) {
+  compatSelectedId = Number(userId);
+  document.querySelectorAll('.compat-pick').forEach(b => b.classList.toggle('active', Number(b.dataset.userId) === compatSelectedId));
+  loadCompat(compatSelectedId);
+}
+window.selectCompatWith = selectCompatWith;
+
+/** Ensures `userId` has a picker card even if they're not a friend yet
+ *  (e.g. found via search), then selects them. */
 async function ensureCompatOption(userId, displayName) {
-  const select = document.getElementById('compatSelect');
-  if (!select.dataset.loaded) await loadCompatPage();
-  if (!select.querySelector(`option[value="${userId}"]`)) {
-    const opt = document.createElement('option');
-    opt.value = userId;
-    opt.textContent = displayName;
-    select.prepend(opt);
+  if (!compatPickerLoaded) await loadCompatPage();
+  const row = document.getElementById('compatPickerRow');
+  if (!row.querySelector(`.compat-pick[data-user-id="${userId}"]`)) {
+    const person = peopleCache[userId] || { userId, displayName, avatarUrl: null };
+    row.insertAdjacentHTML('afterbegin', `
+      <button type="button" class="compat-pick" data-user-id="${userId}" onclick="selectCompatWith(${userId})">
+        <span class="compat-pick-avatar">${mediaTag({ url: person.avatarUrl, name: person.displayName, seed: userId })}</span>
+        <span class="compat-pick-name">${escapeHtml(person.displayName)}</span>
+      </button>
+    `);
   }
-  select.value = userId;
+  selectCompatWith(userId);
 }
 
 async function goToCompatWith(userId, displayName) {
   activateTab('compat'); // side-effect-free — safe to call without also triggering loadCompatPage()
   await ensureCompatOption(userId, displayName);
-  loadCompat(userId);
 }
 
 async function loadCompat(withUserId) {
@@ -398,10 +505,23 @@ async function loadCompat(withUserId) {
 
 function renderCompat(data, withUserId) {
   const other = peopleCache[withUserId] || { displayName: '?' };
-  document.getElementById('duoMe').innerHTML = mediaTag({ url: currentProfile?.avatarUrl, name: currentProfile?.displayName, seed: currentProfile?.id });
+  const myName = currentProfile?.displayName || 'You';
+  const firstName = n => (n || '').split(' ')[0];
+  document.getElementById('duoMe').innerHTML = mediaTag({ url: currentProfile?.avatarUrl, name: myName, seed: currentProfile?.id });
   document.getElementById('duoOther').innerHTML = mediaTag({ url: other.avatarUrl, name: other.displayName, seed: withUserId });
-  document.getElementById('compatValue').textContent = `${data.score}%`;
+  document.getElementById('duoMeLabel').textContent = myName;
+  document.getElementById('duoOtherLabel').textContent = other.displayName || 'Them';
+  document.getElementById('faderScaleA').textContent = firstName(myName);
+  document.getElementById('faderScaleB').textContent = firstName(other.displayName);
+  document.getElementById('compatValue').textContent = data.score;
   document.getElementById('compatCaption').textContent = data.caption || '';
+
+  // The fader sits centered at a 50/50 split and leans toward whichever side
+  // shares more — a plain number can't show that, the position does.
+  const lean = Math.max(-40, Math.min(40, (data.score - 50) * 0.8));
+  document.getElementById('faderFill').style.width = `${50 + lean}%`;
+  document.getElementById('faderCap').style.left = `${50 + lean}%`;
+
   document.getElementById('sharedArtists').innerHTML = (data.sharedArtists || []).map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') || '<span class="empty-note">No overlap found.</span>';
   document.getElementById('sharedGenres').innerHTML = (data.sharedGenres || []).map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('') || '<span class="empty-note">No overlap found.</span>';
 }

@@ -18,7 +18,7 @@ function initialsOf(name) {
   return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-const SWATCHES = ['#2fb67c', '#5b6ee1', '#e8536f', '#c98f2b', '#3fa7c9'];
+const SWATCHES = ['#4c8bff', '#ff9a3e', '#33c48d', '#f0496b', '#8f6fe8'];
 function swatchColor(seed) {
   const n = typeof seed === 'number' ? seed : String(seed).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return SWATCHES[n % SWATCHES.length];

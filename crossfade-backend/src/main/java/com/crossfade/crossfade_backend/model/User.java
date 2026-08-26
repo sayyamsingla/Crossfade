@@ -1,10 +1,7 @@
 package com.crossfade.crossfade_backend.model;
 
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,4 +19,8 @@ public class User {
     private String handle;
     private String bio;
     private String avatarUrl;
+
+    @ManyToOne
+    @JoinColumn(name = "now_playing_track_id")
+    private Track nowPlayingTrack;
 }

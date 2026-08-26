@@ -21,5 +21,12 @@ crossfade-backend/HELP.md
 crossfade-frontend/node_modules/
 crossfade-frontend/npm-debug.log*
 
+### Local secrets ###
+crossfade-backend/src/main/resources/application-local.properties
+.env
+
+### Local-only project notes ###
+CLAUDE.md
+
 ### Editors ###
 .vscode/

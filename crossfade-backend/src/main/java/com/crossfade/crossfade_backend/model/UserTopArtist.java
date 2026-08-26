@@ -22,6 +22,7 @@ public class UserTopArtist {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @Column(name = "`rank`")
     private Integer rank;
 
 }
