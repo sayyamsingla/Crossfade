@@ -3,17 +3,27 @@
 // via js/api.js. See README.md for the full endpoint contract.
 // ---------------------------------------------------------------------------
 
-const CURRENT_USER_ID = window.CROSSFADE_CONFIG.CURRENT_USER_ID;
+let CURRENT_USER_ID = window.CROSSFADE_CONFIG.CURRENT_USER_ID;
 
 let currentProfile = null;      // your own profile (CURRENT_USER_ID) — cached once, used for compat "you" avatar
 let viewedUserId = CURRENT_USER_ID; // whose profile the Profile tab is currently showing
 let peopleCache = {};           // userId -> { userId, displayName, avatarUrl, topGenre } — filled in from every source (profile loads, friends list, search)
 let friendsListCache = null;    // array — people you follow, used by both the Friends tab and the Compatibility picker
 let feedLoaded = false;
-let friendsLoaded = false;
 
 // ---------------------------------------------------------------------- init
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('loginBtn').href = `${window.CROSSFADE_CONFIG.API_BASE}/oauth2/authorization/spotify`;
+
+  if (new URLSearchParams(window.location.search).get('loginError')) {
+    document.getElementById('loginErrorNote').style.display = 'block';
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try { await Api.logout(); } catch (_) { /* best-effort */ }
+    window.location.reload();
+  });
+
   initTabs();
   document.getElementById('retryBtn').addEventListener('click', () => loadProfilePage());
   document.getElementById('commentForm').addEventListener('submit', handleCommentSubmit);
@@ -32,8 +42,107 @@ document.addEventListener('DOMContentLoaded', () => {
     goToCompatWith(viewedUserId, person ? person.displayName : 'them');
   });
   document.getElementById('playlistBackBtn').addEventListener('click', closePlaylistPage);
-  loadProfilePage();
+  document.getElementById('syncBtn').addEventListener('click', handleSyncClick);
+  document.getElementById('chooseHandleForm').addEventListener('submit', handleChooseHandleSubmit);
+
+  initSession();
 });
+
+/** Resolves who's logged in via the session cookie before loading anything
+ *  else. Shows the "log in with Spotify" page on failure (no session, or
+ *  session expired) instead of trying to render a profile for nobody. New
+ *  accounts (and any pre-existing account that hasn't picked a real handle
+ *  yet) are routed to the handle picker instead of straight into the app. */
+async function initSession() {
+  try {
+    const me = await Api.getMe();
+    CURRENT_USER_ID = me.id;
+    window.CROSSFADE_CONFIG.CURRENT_USER_ID = me.id;
+    viewedUserId = me.id;
+    document.getElementById('logoutBtn').style.display = 'inline-block';
+    if (!me.hasChosenHandle) {
+      activateTab('choose-handle');
+      return;
+    }
+    activateTab('profile');
+    loadProfilePage();
+  } catch (err) {
+    activateTab('loggedout');
+  }
+}
+
+async function handleChooseHandleSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('handleInput');
+  const errorEl = document.getElementById('handleError');
+  const btn = document.getElementById('handleSubmitBtn');
+  errorEl.style.display = 'none';
+  btn.disabled = true;
+  try {
+    await Api.setHandle(input.value.trim());
+    activateTab('profile');
+    loadProfilePage();
+  } catch (err) {
+    errorEl.textContent = err.message || 'Could not save that handle.';
+    errorEl.style.display = 'block';
+    btn.disabled = false;
+  }
+}
+
+// ------------------------------------------------------------------ sync
+/** Formats a future ISO instant as a short "in Nd"/"in Nh" style string. */
+function formatTimeUntil(isoString) {
+  const target = new Date(isoString).getTime();
+  if (Number.isNaN(target)) return '';
+  const diffSec = Math.max(0, Math.floor((target - Date.now()) / 1000));
+  const units = [
+    ['d', 86400], ['h', 3600], ['m', 60],
+  ];
+  for (const [label, secs] of units) {
+    const val = Math.floor(diffSec / secs);
+    if (val >= 1) return `in ${val}${label}`;
+  }
+  return 'soon';
+}
+
+async function refreshSyncStatus() {
+  const btn = document.getElementById('syncBtn');
+  try {
+    const status = await Api.getSyncStatus();
+    const remaining = status.syncsAllowed - status.syncsUsed;
+    if (remaining > 0) {
+      btn.textContent = 'Sync now';
+      btn.disabled = false;
+      btn.title = `Pulls your latest top tracks, top artists, and playlists from Spotify. You can sync ${status.syncsAllowed} times every 7 days — ${remaining} left this week.`;
+    } else {
+      btn.textContent = 'Sync now';
+      btn.disabled = true;
+      btn.title = `You have used all ${status.syncsAllowed} syncs for this 7 day period. The oldest one drops off ${formatTimeUntil(status.nextAvailableAt)}, freeing up another sync.`;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function handleSyncClick() {
+  const btn = document.getElementById('syncBtn');
+  btn.disabled = true;
+  const previousText = btn.textContent;
+  btn.textContent = 'Syncing…';
+  try {
+    await Api.triggerSync();
+    if (viewedUserId === CURRENT_USER_ID) loadProfilePage();
+    await refreshSyncStatus();
+  } catch (err) {
+    if (err.message && err.message.includes('429')) {
+      await refreshSyncStatus();
+    } else {
+      btn.textContent = previousText;
+      btn.disabled = false;
+      showBanner(err.message || 'Sync failed.');
+    }
+  }
+}
 
 function initTabs() {
   document.querySelectorAll('.nav-link').forEach(btn => {
@@ -55,6 +164,7 @@ function initTabs() {
 function activateTab(tab) {
   document.querySelectorAll('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  document.querySelector('.app-shell').classList.toggle('signed-out', tab === 'loggedout' || tab === 'choose-handle');
 }
 
 /** Jump to someone's profile from anywhere (friend card, search result,
@@ -119,6 +229,7 @@ function renderHero(p) {
   document.getElementById('heroAvatarWrap').innerHTML = mediaTag({ url: p.avatarUrl, name: p.displayName, seed: p.id });
   document.getElementById('idChip').textContent = initialsOf(currentProfile ? currentProfile.displayName : p.displayName);
   document.getElementById('heroName').textContent = p.displayName;
+  document.getElementById('heroHandle').textContent = p.handle || '';
   document.getElementById('heroFollowers').textContent = (p.followersCount ?? 0).toLocaleString();
   document.getElementById('heroFollowing').textContent = (p.followingCount ?? 0).toLocaleString();
   document.getElementById('heroTopGenre').textContent = p.topGenre || '—';
@@ -127,9 +238,29 @@ function renderHero(p) {
 
   const banner = document.getElementById('viewingBanner');
   const compareBtn = document.getElementById('compareBtn');
+  const followBtn = document.getElementById('heroFollowBtn');
+  const syncBtn = document.getElementById('syncBtn');
   banner.style.display = isSelf ? 'none' : 'flex';
   if (!isSelf) document.getElementById('viewingText').textContent = `Viewing ${p.displayName}'s profile`;
   compareBtn.style.display = isSelf ? 'none' : 'inline-block';
+  syncBtn.style.display = isSelf ? 'inline-block' : 'none';
+  if (isSelf) refreshSyncStatus();
+
+  followBtn.style.display = isSelf ? 'none' : 'inline-block';
+  if (!isSelf) {
+    followBtn.disabled = false;
+    followBtn.onclick = async () => {
+      await toggleFollow(p.id, followBtn);
+      Api.getProfile(p.id).then(fresh => {
+        document.getElementById('heroFollowers').textContent = (fresh.followersCount ?? 0).toLocaleString();
+      });
+    };
+    getFriendsList().then(friends => {
+      const isFollowing = friends.some(u => u.userId === p.id);
+      followBtn.classList.toggle('following', isFollowing);
+      followBtn.textContent = isFollowing ? 'Following' : 'Follow';
+    });
+  }
 }
 
 function renderNowPlaying(data) {
@@ -315,7 +446,7 @@ async function handleCommentSubmit(e) {
   const btn = document.getElementById('commentSubmitBtn');
   btn.disabled = true;
   try {
-    await Api.postComment(viewedUserId, CURRENT_USER_ID, text);
+    await Api.postComment(viewedUserId, text);
     textarea.value = '';
     await loadSection(() => Api.getComments(viewedUserId).then(renderComments), 'commentList');
   } catch (err) {
@@ -363,41 +494,47 @@ async function getFriendsList() {
 }
 
 async function loadFriendsPage() {
-  if (friendsLoaded) return;
   await loadSection(async () => {
     const friends = await getFriendsList();
     document.getElementById('peopleHeading').textContent = 'Your friends';
-    renderPeopleGrid(friends);
+    renderPeopleGrid(friends, { showFollow: true, removeOnUnfollow: true });
   }, 'peopleGrid');
-  friendsLoaded = true;
 }
 
-function renderPeopleGrid(people, { showFollow = false } = {}) {
+function renderPeopleGrid(people, { showFollow = false, removeOnUnfollow = false } = {}) {
   const el = document.getElementById('peopleGrid');
   if (!people || !people.length) { el.innerHTML = '<p class="empty-note">Nobody here yet.</p>'; return; }
   const friendIds = new Set((friendsListCache || []).map(u => u.userId));
   el.innerHTML = people.map(u => {
     const isFriend = friendIds.has(u.userId);
     return `
-    <div class="person-card">
+    <div class="person-card" data-user-id="${u.userId}">
       <div class="clickable-area" onclick="viewProfile(${u.userId})">
         <div class="person-avatar">${mediaTag({ url: u.avatarUrl, name: u.displayName, seed: u.userId })}</div>
         <div class="person-name">${escapeHtml(u.displayName)}</div>
+        ${u.handle ? `<div class="person-handle mono">${escapeHtml(u.handle)}</div>` : ''}
         ${u.topGenre ? `<div class="person-sub">${escapeHtml(u.topGenre)}</div>` : ''}
       </div>
-      ${showFollow ? `<button class="follow-btn ${isFriend ? 'following' : ''}" onclick="event.stopPropagation(); toggleFollow(${u.userId}, this)">${isFriend ? 'Following' : 'Follow'}</button>` : ''}
+      ${showFollow ? `<button class="follow-btn ${isFriend ? 'following' : ''}" onclick="event.stopPropagation(); toggleFollow(${u.userId}, this, ${removeOnUnfollow})">${isFriend ? 'Following' : 'Follow'}</button>` : ''}
     </div>
   `;
   }).join('');
 }
 
-async function toggleFollow(userId, btn) {
+async function toggleFollow(userId, btn, removeOnUnfollow = false) {
   const isFollowing = btn.classList.contains('following');
   btn.disabled = true;
   try {
     if (isFollowing) {
       await Api.unfollowUser(userId);
       friendsListCache = (friendsListCache || []).filter(u => u.userId !== userId);
+      if (removeOnUnfollow) {
+        btn.closest('.person-card')?.remove();
+        if (!document.querySelector('#peopleGrid .person-card')) {
+          document.getElementById('peopleGrid').innerHTML = '<p class="empty-note">Nobody here yet.</p>';
+        }
+        return;
+      }
       btn.classList.remove('following');
       btn.textContent = 'Follow';
     } else {
@@ -423,7 +560,7 @@ function handleSearchInput(e) {
   clearTimeout(searchDebounce);
   if (!query) {
     document.getElementById('peopleHeading').textContent = 'Your friends';
-    getFriendsList().then(friends => renderPeopleGrid(friends));
+    getFriendsList().then(friends => renderPeopleGrid(friends, { showFollow: true, removeOnUnfollow: true }));
     return;
   }
   searchDebounce = setTimeout(async () => {

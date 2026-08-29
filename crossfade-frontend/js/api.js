@@ -21,6 +21,7 @@ async function apiFetch(path, options = {}) {
   try {
     res = await fetch(url, {
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      credentials: 'include',
       ...options,
     });
   } catch (err) {
@@ -36,7 +37,8 @@ async function apiFetch(path, options = {}) {
     throw new ApiError(`${options.method || 'GET'} ${path} failed: ${res.status} ${res.statusText}${detail ? ' — ' + detail : ''}`);
   }
   if (res.status === 204) return null;
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /** Resolve an image URL returned by the backend. Accepts absolute URLs
@@ -52,6 +54,27 @@ function resolveImageUrl(url) {
 // delegates to js/mock-data.js instead of hitting the network. Delete both
 // files (and this check) once the real backend is ready.
 const RealApi = {
+  // ---- auth / session --------------------------------------------------
+  /** Who's logged in, resolved from the session cookie. */
+  getMe() {
+    return apiFetch(`/me`);
+  },
+  logout() {
+    return apiFetch(`/logout`, { method: 'POST' });
+  },
+  setHandle(handle) {
+    return apiFetch(`/me/handle`, {
+      method: 'POST',
+      body: JSON.stringify({ handle }),
+    });
+  },
+  getSyncStatus() {
+    return apiFetch(`/sync/spotify/status`);
+  },
+  triggerSync() {
+    return apiFetch(`/sync/spotify`, { method: 'POST' });
+  },
+
   // ---- profile -------------------------------------------------------
   getProfile(userId) {
     return apiFetch(`/users/${userId}`);
@@ -69,7 +92,7 @@ const RealApi = {
     return apiFetch(`/users/${userId}/top-genres?limit=${limit}`);
   },
   getPlaylists(userId) {
-    return apiFetch(`/users/${userId}/playlists`);
+    return apiFetch(`/users/${userId}/playlists?viewerId=${window.CROSSFADE_CONFIG.CURRENT_USER_ID}`);
   },
   getPlaylistTracks(playlistId) {
     return apiFetch(`/playlists/${playlistId}/tracks`);
@@ -83,12 +106,12 @@ const RealApi = {
 
   // ---- comments (profile wall) ---------------------------------------
   getComments(userId) {
-    return apiFetch(`/users/${userId}/comments`);
+    return apiFetch(`/users/${userId}/comments?viewerId=${window.CROSSFADE_CONFIG.CURRENT_USER_ID}`);
   },
-  postComment(userId, authorId, text) {
+  postComment(userId, text) {
     return apiFetch(`/users/${userId}/comments`, {
       method: 'POST',
-      body: JSON.stringify({ authorId, text }),
+      body: JSON.stringify({ text }),
     });
   },
   likeComment(commentId) {

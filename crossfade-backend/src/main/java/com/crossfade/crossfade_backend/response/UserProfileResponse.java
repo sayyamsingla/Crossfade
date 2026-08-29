@@ -17,4 +17,5 @@ public class UserProfileResponse {
     private Long followersCount;
     private Long followingCount;
     private String topGenre;
+    private Boolean hasChosenHandle;
 }

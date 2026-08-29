@@ -14,7 +14,12 @@ public class Track {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String title;
+
+    @Column(length = 1000)
     private String coverUrl;
+
+    @Column(unique = true)
+    private String spotifyId;
 
     @ManyToOne
     @JoinColumn(name = "artist_id")

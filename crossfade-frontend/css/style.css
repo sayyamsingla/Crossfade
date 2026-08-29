@@ -117,6 +117,77 @@ textarea:focus-visible, .clickable-name:focus-visible, .person-card:focus-visibl
 .page { max-width: 720px; margin: 0; padding: 34px 32px 60px; display: none; }
 .page.active { display: block; }
 
+.logout-btn {
+  background: none; border: 1px solid var(--line); color: var(--text-muted);
+  font-size: 11px; font-weight: 700; padding: 6px 11px; border-radius: 7px; cursor: pointer;
+}
+
+.sync-btn {
+  display: none; margin: 0; background: var(--surface); border: 1px solid var(--line); color: var(--text-primary);
+  font-size: 12.5px; font-weight: 700; padding: 8px 15px; border-radius: 9px; cursor: pointer;
+}
+.sync-btn:disabled { color: var(--text-muted); cursor: default; opacity: 0.6; }
+
+/* ---- signed-out state: full-bleed welcome screen, no sidebar/nav chrome ---- */
+.app-shell.signed-out .sidebar { display: none; }
+.app-shell.signed-out .main-col { width: 100%; }
+.app-shell.signed-out #page-loggedout,
+.app-shell.signed-out #page-choose-handle { max-width: none; padding: 0; }
+
+.welcome-split { min-height: 100vh; display: flex; justify-content: center; background: var(--bg); }
+.welcome-left {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 60px 32px; max-width: 560px;
+}
+
+.welcome-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 56px; }
+.welcome-brand-mark { width: 32px; height: 20px; overflow: visible; transform: rotate(-4deg); flex-shrink: 0; }
+.welcome-brand-mark path { fill: none; stroke-width: 2.4; stroke-linecap: round; }
+.welcome-brand-mark .fade-a { stroke: var(--accent); }
+.welcome-brand-mark .fade-b { stroke: var(--accent-2); }
+.welcome-brand-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+
+.welcome-headline {
+  font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; line-height: 1.12;
+  font-size: clamp(28px, 3.4vw, 40px); margin: 0 0 18px;
+}
+.welcome-tagline {
+  font-size: 15px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 28px;
+}
+.welcome-copy {
+  font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 32px;
+  padding-top: 24px; border-top: 1px solid var(--line);
+}
+
+.login-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  background: #1DB954; color: #06170c; text-decoration: none;
+  font-family: var(--font-body); font-size: 14px; font-weight: 700;
+  padding: 13px 26px; border-radius: 999px; letter-spacing: -0.005em;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.login-btn:hover { background: #22e065; }
+.login-btn:active { transform: scale(0.97); }
+.spotify-glyph { width: 20px; height: 20px; flex-shrink: 0; }
+.welcome-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 16px 0 0; }
+
+.handle-form { width: 100%; max-width: 340px; margin-top: 8px; }
+.handle-input-row {
+  display: flex; align-items: center; gap: 2px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin-bottom: 4px;
+}
+.handle-at { font-family: var(--font-mono); color: var(--text-muted); font-size: 15px; }
+.handle-input {
+  flex: 1; background: none; border: none; outline: none; color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 15px;
+}
+.handle-input::placeholder { color: var(--text-muted); }
+.handle-submit-btn {
+  width: 100%; margin-top: 14px; background: var(--accent); color: var(--accent-ink);
+}
+.handle-submit-btn:hover { background: #6ea0ff; }
+
 @media (max-width: 720px) {
   .app-shell { flex-direction: column; }
   .sidebar {
@@ -129,11 +200,14 @@ textarea:focus-visible, .clickable-name:focus-visible, .person-card:focus-visibl
   .page { padding: 24px 20px 50px; }
 }
 
-/* ---- hero ---- */
-.hero { display: flex; align-items: center; gap: 22px; padding: 30px 0 22px; }
-.hero-avatar { width: 92px; height: 92px; border-radius: 50%; background: var(--surface-hi); flex-shrink: 0; }
+/* ---- hero ----
+   Name grows from a flat 30px to a clamp that lets Unbounded's weight
+   actually read as hierarchy instead of "slightly bold body text." */
+.hero { display: flex; align-items: flex-end; gap: 26px; padding: 36px 0 30px; }
+.hero-avatar { width: 100px; height: 100px; border-radius: 50%; background: var(--surface-hi); flex-shrink: 0; }
 .hero-kicker { display: none; }
-.hero-name { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 10px; line-height: 1.1; }
+.hero-name { font-family: var(--font-display); font-size: clamp(40px, 7vw, 58px); font-weight: 800; letter-spacing: -0.02em; margin: 0; line-height: 0.98; }
+.hero-handle { font-size: 13px; color: var(--text-muted); margin: 6px 0 12px; }
 .hero-meta { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
 .hero-meta b { font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); }
 .hero-bio { display: none; font-size: 13px; color: var(--text-secondary); margin: 9px 0 0; max-width: 480px; }
@@ -143,11 +217,15 @@ textarea:focus-visible, .clickable-name:focus-visible, .person-card:focus-visibl
   background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 9px 14px; margin: 18px 0 -6px;
 }
 .viewing-banner button { background: none; border: none; color: var(--accent); font-weight: 700; cursor: pointer; font-size: 12.5px; padding: 0; }
+.hero-actions { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
 .compare-btn {
-  display: none; margin-top: 13px; background: var(--surface); border: 1px solid var(--line); color: var(--text-primary);
+  display: none; margin: 0; background: var(--surface); border: 1px solid var(--line); color: var(--text-primary);
   font-size: 12.5px; font-weight: 700; padding: 8px 15px; border-radius: 9px; cursor: pointer;
 }
 .compare-btn:hover { background: var(--surface-hi); border-color: var(--accent); }
+.hero-follow-btn {
+  display: none; margin: 0; font-size: 12.5px; padding: 8px 15px; border-radius: 9px;
+}
 
 .clickable-name { cursor: pointer; }
 .clickable-name:hover { color: var(--accent); text-decoration: underline; }
@@ -165,12 +243,22 @@ textarea:focus-visible, .clickable-name:focus-visible, .person-card:focus-visibl
 .np-title { font-size: 13px; font-weight: 600; line-height: 1.3; }
 .np-artist { font-size: 12px; color: var(--text-muted); line-height: 1.3; }
 
-section.block { padding: 30px 0; border-top: 1px solid var(--line); }
-.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 17px; }
+section.block { padding: 34px 0; border-top: 1px solid var(--line); }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .section-title {
-  font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
+  font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
 }
 .section-sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ---- channel eyebrow: a tiny level indicator standing in for section-sub
+   text, so the "mixing console" idea shows up in the page's structure, not
+   just inside the compatibility fader. Only "live" (Top tracks, tied to
+   current listening activity) pulses — everything else stays still. ---- */
+.channel-eyebrow { display: flex; align-items: center; gap: 8px; }
+.channel-eyebrow .ch-label {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
 
 /* ---- ranked tracks ---- */
 .track-row { display: flex; align-items: center; gap: 14px; padding: 10px 0; }
@@ -385,6 +473,7 @@ section.block { padding: 30px 0; border-top: 1px solid var(--line); }
 .clickable-area:hover .person-avatar { transform: scale(1.04); }
 .clickable-area:hover .person-name { color: var(--accent); }
 .person-name { font-size: 13px; font-weight: 700; transition: color 0.12s ease; }
+.person-handle { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 .person-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
 .follow-btn {
   margin-top: 9px; background: none; border: 1px solid var(--line); color: var(--text-primary);

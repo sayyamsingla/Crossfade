@@ -9,4 +9,5 @@ import java.util.List;
 
 public interface UserTopGenreRepository extends JpaRepository<UserTopGenre, UserTopGenreId> {
     List<UserTopGenre> findByUser_IdOrderByPercentageDesc(Long userId);
+    void deleteByUser_Id(Long userId);
 }

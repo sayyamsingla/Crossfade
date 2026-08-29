@@ -12,4 +12,6 @@ public class PlaylistResponse {
     private String title;
     private Long trackCount;
     private String coverUrl;
+    private Long likeCount;
+    private Boolean likedByCurrentUser;
 }

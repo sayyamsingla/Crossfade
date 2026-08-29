@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 
 @Entity @Data @AllArgsConstructor
 @NoArgsConstructor
@@ -23,6 +25,6 @@ public class Comment {
     @JoinColumn(name = "commentator_id")
     private User commentator;
 
-
+    private Instant createdAt;
 
 }

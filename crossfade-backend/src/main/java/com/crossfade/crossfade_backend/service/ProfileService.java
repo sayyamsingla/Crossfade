@@ -1,27 +1,32 @@
 package com.crossfade.crossfade_backend.service;
 
+import com.crossfade.crossfade_backend.model.Comment;
+import com.crossfade.crossfade_backend.model.CommentLike;
 import com.crossfade.crossfade_backend.model.Playlist;
+import com.crossfade.crossfade_backend.model.PlaylistLike;
+import com.crossfade.crossfade_backend.model.PlaylistTrack;
 import com.crossfade.crossfade_backend.model.Track;
 import com.crossfade.crossfade_backend.model.User;
 import com.crossfade.crossfade_backend.model.UserTopArtist;
 import com.crossfade.crossfade_backend.model.UserTopGenre;
 import com.crossfade.crossfade_backend.model.UserTopTrack;
+import com.crossfade.crossfade_backend.repo.CommentLikeRepository;
+import com.crossfade.crossfade_backend.repo.CommentRepository;
 import com.crossfade.crossfade_backend.repo.FollowRepository;
+import com.crossfade.crossfade_backend.repo.PlaylistLikeRepository;
 import com.crossfade.crossfade_backend.repo.PlaylistRepository;
 import com.crossfade.crossfade_backend.repo.PlaylistTrackRepository;
 import com.crossfade.crossfade_backend.repo.UserRepository;
 import com.crossfade.crossfade_backend.repo.UserTopArtistRepository;
 import com.crossfade.crossfade_backend.repo.UserTopGenreRepository;
 import com.crossfade.crossfade_backend.repo.UserTopTrackRepository;
-import com.crossfade.crossfade_backend.response.PlaylistResponse;
-import com.crossfade.crossfade_backend.response.TopArtistResponse;
-import com.crossfade.crossfade_backend.response.TopGenreResponse;
-import com.crossfade.crossfade_backend.response.TopTrackResponse;
-import com.crossfade.crossfade_backend.response.UserProfileResponse;
+import com.crossfade.crossfade_backend.response.*;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -48,6 +53,18 @@ public class ProfileService {
     @Autowired
     PlaylistTrackRepository playlistTrackRepo;
 
+    @Autowired
+    CommentRepository commentRepo;
+
+    @Autowired
+    CommentLikeRepository commentLikeRepo;
+
+    @Autowired
+    PlaylistLikeRepository playlistLikeRepo;
+
+    @Autowired
+    FeedService feedService;
+
 
 
     public UserProfileResponse getUserProfile(Long id) {
@@ -66,8 +83,27 @@ public class ProfileService {
         response.setFollowersCount(followerCount);
         response.setFollowingCount(followingCount);
         response.setTopGenre(topGenres.isEmpty() ? null : topGenres.get(0).getGenreName());
+        response.setHasChosenHandle(user.isHasChosenHandle());
 
         return response;
+    }
+
+    @Transactional
+    public UserProfileResponse setHandle(Long userId, String rawHandle) {
+        String handle = rawHandle == null ? "" : rawHandle.trim();
+        if (!handle.matches("^[A-Za-z0-9_]{3,20}$")) {
+            throw new IllegalArgumentException("Handle must be 3 to 20 letters, numbers, or underscores.");
+        }
+        String withAt = "@" + handle;
+        if (userRepo.existsByHandleIgnoreCaseAndIdNot(withAt, userId)) {
+            throw new IllegalArgumentException("That handle is already taken.");
+        }
+        User user = userRepo.findById(userId).orElseThrow(() ->
+                new EntityNotFoundException("User Not Found " + userId));
+        user.setHandle(withAt);
+        user.setHasChosenHandle(true);
+        userRepo.save(user);
+        return getUserProfile(userId);
     }
 
     public Track getNowPlayingTrack(Long id) {
@@ -144,7 +180,7 @@ public class ProfileService {
         return result;
     }
 
-    public List<PlaylistResponse> getUserPlaylists(Long id) {
+    public List<PlaylistResponse> getUserPlaylists(Long id, Long viewerId) {
         List<Playlist> playlists = playlistRepo.findByOwner_Id(id);
 
         List<PlaylistResponse> result = new ArrayList<>();
@@ -155,10 +191,131 @@ public class ProfileService {
             response.setTitle(playlist.getTitle());
             response.setTrackCount(playlistTrackRepo.countByPlaylist_Id(playlist.getId()));
             response.setCoverUrl(playlist.getCoverUrl());
+            response.setLikeCount(playlistLikeRepo.countByPlaylist_Id(playlist.getId()));
+            response.setLikedByCurrentUser(viewerId != null && playlistLikeRepo.existsByPlaylist_IdAndUser_Id(playlist.getId(), viewerId));
 
             result.add(response);
         }
 
         return result;
+    }
+
+    public List<PlaylistTrackResponse> getPlaylistTracks(Long playlistId) {
+        List<PlaylistTrack> playlistTracks = playlistTrackRepo.findByPlaylist_IdOrderByPositionAsc(playlistId);
+
+        List<PlaylistTrackResponse> result = new ArrayList<>();
+
+        for (PlaylistTrack pt : playlistTracks) {
+            PlaylistTrackResponse response = new PlaylistTrackResponse();
+            response.setPosition(pt.getPosition());
+            response.setTrackId(pt.getTrack().getId());
+            response.setTitle(pt.getTrack().getTitle());
+            response.setArtist(pt.getTrack().getArtist().getName());
+            response.setCoverUrl(pt.getTrack().getCoverUrl());
+
+            result.add(response);
+        }
+
+        return result;
+    }
+
+    public PostCommentResponse addCommentToProfile(Long authorId, String text, Long receiverId) {
+        User author = userRepo.findById(authorId).orElseThrow(() ->
+                new EntityNotFoundException("User Not Found " + authorId));
+        User receiver = userRepo.findById(receiverId).orElseThrow(() ->
+                new EntityNotFoundException("User Not Found " + receiverId));
+
+        Comment comment = new Comment();
+        comment.setText(text);
+        comment.setCommentator(author);
+        comment.setReceiver(receiver);
+        comment.setCreatedAt(Instant.now());
+        commentRepo.save(comment);
+
+        feedService.recordComment(author, receiver, text);
+
+        return new PostCommentResponse(authorId, text);
+    }
+
+    public List<CommentResponse> getCommentsForProfile(Long receiverId, Long viewerId) {
+        List<Comment> comments = commentRepo.findByReceiver_IdOrderByCreatedAtDesc(receiverId);
+
+        List<CommentResponse> result = new ArrayList<>();
+
+        for (Comment comment : comments) {
+            User author = comment.getCommentator();
+
+            CommentAuthorResponse authorResponse = new CommentAuthorResponse();
+            authorResponse.setUserId(author.getId());
+            authorResponse.setDisplayName(author.getDisplayName());
+            authorResponse.setAvatarUrl(author.getAvatarUrl());
+
+            CommentResponse response = new CommentResponse();
+            response.setCommentId(comment.getId());
+            response.setAuthor(authorResponse);
+            response.setText(comment.getText());
+            response.setCreatedAt(comment.getCreatedAt());
+            response.setLikeCount(commentLikeRepo.countByComment_Id(comment.getId()));
+            response.setLikedByCurrentUser(viewerId != null && commentLikeRepo.existsByComment_IdAndUser_Id(comment.getId(), viewerId));
+
+            result.add(response);
+        }
+
+        return result;
+    }
+
+    public LikeResponse likeComment(Long commentId, Long userId) {
+        Comment comment = commentRepo.findById(commentId).orElseThrow(() ->
+                new EntityNotFoundException("Comment Not Found " + commentId));
+        User user = userRepo.findById(userId).orElseThrow(() ->
+                new EntityNotFoundException("User Not Found " + userId));
+
+        if (!commentLikeRepo.existsByComment_IdAndUser_Id(commentId, userId)) {
+            CommentLike like = new CommentLike();
+            like.setComment(comment);
+            like.setUser(user);
+            commentLikeRepo.save(like);
+        }
+
+        return new LikeResponse(commentLikeRepo.countByComment_Id(commentId), true);
+    }
+
+    @Transactional
+    public LikeResponse unlikeComment(Long commentId, Long userId) {
+        if (!commentRepo.existsById(commentId)) {
+            throw new EntityNotFoundException("Comment Not Found " + commentId);
+        }
+
+        commentLikeRepo.deleteByComment_IdAndUser_Id(commentId, userId);
+
+        return new LikeResponse(commentLikeRepo.countByComment_Id(commentId), false);
+    }
+
+    public LikeResponse likePlaylist(Long playlistId, Long userId) {
+        Playlist playlist = playlistRepo.findById(playlistId).orElseThrow(() ->
+                new EntityNotFoundException("Playlist Not Found " + playlistId));
+        User user = userRepo.findById(userId).orElseThrow(() ->
+                new EntityNotFoundException("User Not Found " + userId));
+
+        if (!playlistLikeRepo.existsByPlaylist_IdAndUser_Id(playlistId, userId)) {
+            PlaylistLike like = new PlaylistLike();
+            like.setPlaylist(playlist);
+            like.setUser(user);
+            playlistLikeRepo.save(like);
+            feedService.recordLikePlaylist(user, playlist);
+        }
+
+        return new LikeResponse(playlistLikeRepo.countByPlaylist_Id(playlistId), true);
+    }
+
+    @Transactional
+    public LikeResponse unlikePlaylist(Long playlistId, Long userId) {
+        if (!playlistRepo.existsById(playlistId)) {
+            throw new EntityNotFoundException("Playlist Not Found " + playlistId);
+        }
+
+        playlistLikeRepo.deleteByPlaylist_IdAndUser_Id(playlistId, userId);
+
+        return new LikeResponse(playlistLikeRepo.countByPlaylist_Id(playlistId), false);
     }
 }

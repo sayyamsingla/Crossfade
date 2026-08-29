@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface UserTopArtistRepository extends JpaRepository<UserTopArtist, UserTopArtistId> {
     List<UserTopArtist> findByUser_IdOrderByRankAsc(Long userId);
+    void deleteByUser_Id(Long userId);
 }

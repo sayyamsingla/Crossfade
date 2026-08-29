@@ -11,7 +11,7 @@
 </head>
 <body>
 
-<div class="app-shell">
+<div class="app-shell signed-out">
   <aside class="sidebar">
     <div class="brand">
       <svg class="brand-mark" viewBox="0 0 32 20" aria-hidden="true">
@@ -28,6 +28,7 @@
     </nav>
     <div class="nav-right">
       <div class="id-chip" id="idChip">?</div>
+      <button class="logout-btn" id="logoutBtn" type="button" style="display:none;">Log out</button>
     </div>
   </aside>
 
@@ -37,8 +38,65 @@
       <button id="retryBtn">Retry</button>
     </div>
 
+<!-- ================= LOGGED OUT ================= -->
+<div class="page active" id="page-loggedout">
+  <div class="welcome-split">
+    <div class="welcome-left">
+      <div class="welcome-brand">
+        <svg class="welcome-brand-mark" viewBox="0 0 32 20" aria-hidden="true">
+          <path class="fade-a" d="M0 16 C 8 16, 10 4, 18 4 S 28 16, 32 16" />
+          <path class="fade-b" d="M0 4 C 8 4, 10 16, 18 16 S 28 4, 32 4" />
+        </svg>
+        <span class="welcome-brand-name">Crossfade</span>
+      </div>
+
+      <h1 class="welcome-headline">A new way to connect through music</h1>
+      <p class="welcome-tagline">See what people are really listening to, compare taste, and find out who shares your sound.</p>
+
+      <p class="welcome-copy">Crossfade turns your Spotify listening history into a profile other people can browse and compare taste against. There is no separate account to create, everything comes straight from Spotify.</p>
+
+      <p class="error-inline" id="loginErrorNote" style="display:none;">That login did not go through. Please try again.</p>
+
+      <a class="login-btn" id="loginBtn" href="#">
+        <svg class="spotify-glyph" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.32-1.32 9.719-.66 13.439 1.62.361.181.54.78.301 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.72 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
+        </svg>
+        <span>Continue with Spotify</span>
+      </a>
+      <p class="welcome-note">Do not have an account? Create one for free at spotify.com, then come back and log in.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CHOOSE HANDLE ================= -->
+<div class="page" id="page-choose-handle">
+  <div class="welcome-split">
+    <div class="welcome-left">
+      <div class="welcome-brand">
+        <svg class="welcome-brand-mark" viewBox="0 0 32 20" aria-hidden="true">
+          <path class="fade-a" d="M0 16 C 8 16, 10 4, 18 4 S 28 16, 32 16" />
+          <path class="fade-b" d="M0 4 C 8 4, 10 16, 18 16 S 28 4, 32 4" />
+        </svg>
+        <span class="welcome-brand-name">Crossfade</span>
+      </div>
+
+      <h1 class="welcome-headline">Choose your handle</h1>
+      <p class="welcome-tagline">This is how people will find and mention you on Crossfade. You can use letters, numbers, and underscores.</p>
+
+      <form id="chooseHandleForm" class="handle-form">
+        <div class="handle-input-row">
+          <span class="handle-at">@</span>
+          <input type="text" id="handleInput" class="handle-input" maxlength="20" placeholder="yourhandle" autocomplete="off" required />
+        </div>
+        <p class="error-inline" id="handleError" style="display:none;"></p>
+        <button type="submit" class="login-btn handle-submit-btn" id="handleSubmitBtn">Continue</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- ================= PROFILE ================= -->
-<div class="page active" id="page-profile">
+<div class="page" id="page-profile">
   <div class="viewing-banner" id="viewingBanner">
     <span id="viewingText"></span>
     <button id="backToMeBtn" type="button">← Back to your profile</button>
@@ -48,30 +106,44 @@
     <div>
       <p class="hero-kicker">Profile</p>
       <p class="hero-name" id="heroName">Loading…</p>
+      <p class="hero-handle mono" id="heroHandle"></p>
       <div class="hero-meta">
         <b id="heroFollowers">–</b> followers &nbsp;·&nbsp;
         <b id="heroFollowing">–</b> following &nbsp;·&nbsp;
         top genre <b id="heroTopGenre">–</b>
       </div>
       <p class="hero-bio" id="heroBio"></p>
-      <button class="compare-btn" id="compareBtn" type="button">Compare taste →</button>
+      <div class="hero-actions">
+        <button class="follow-btn hero-follow-btn" id="heroFollowBtn" type="button">Follow</button>
+        <button class="compare-btn" id="compareBtn" type="button">Compare taste →</button>
+        <button class="sync-btn" id="syncBtn" type="button" style="display:none;" title="">Sync now</button>
+      </div>
     </div>
   </div>
 
   <div class="now-playing-strip" id="nowPlayingStrip"></div>
 
   <section class="block">
-    <div class="section-head"><h2 class="section-title">Top tracks</h2><span class="section-sub">Last 4 weeks</span></div>
+    <div class="section-head">
+      <h2 class="section-title">Top tracks</h2>
+      <div class="channel-eyebrow live"><span class="ch-label">Last 4 weeks</span></div>
+    </div>
     <div id="tracksList"><p class="empty-note">Loading…</p></div>
   </section>
 
   <section class="block">
-    <div class="section-head"><h2 class="section-title">Top artists</h2><span class="section-sub">Last 4 weeks</span></div>
+    <div class="section-head">
+      <h2 class="section-title">Top artists</h2>
+      <div class="channel-eyebrow"><span class="ch-label">Last 4 weeks</span></div>
+    </div>
     <div class="artist-grid" id="artistGrid"><p class="empty-note">Loading…</p></div>
   </section>
 
   <section class="block">
-    <div class="section-head"><h2 class="section-title">Top genres</h2></div>
+    <div class="section-head">
+      <h2 class="section-title">Top genres</h2>
+      <div class="channel-eyebrow"><span class="ch-label">Share of plays</span></div>
+    </div>
     <div class="genre-wrap" id="genreList"><p class="empty-note">Loading…</p></div>
   </section>
 

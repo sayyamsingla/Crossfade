@@ -119,8 +119,12 @@ Return sorted highest-to-lowest — the frontend renders them in the order given
 [ { "playlistId": 1, "title": "Late Night Drive", "trackCount": 42, "coverUrl": null } ]
 ```
 
-### `GET /users/{id}/comments`
-Comments on this user's profile wall.
+### `GET /users/{id}/comments?viewerId={id}`
+Comments on this user's profile wall. There's no auth, so `viewerId` (who's
+asking — always `CURRENT_USER_ID` from the frontend) is passed explicitly as a
+query param so the backend can compute `likedByCurrentUser` per comment.
+`viewerId` is optional; omit it and every comment comes back with
+`likedByCurrentUser: false`.
 ```json
 [
   {
@@ -136,10 +140,11 @@ Comments on this user's profile wall.
 `createdAt` must be an ISO-8601 timestamp — the frontend computes "2h", "3d" etc. itself.
 
 ### `POST /users/{id}/comments`
-Body: `{ "authorId": 1, "text": "..." }` → returns the created comment (same shape as above).
+Body: `{ "authorId": 1, "text": "..." }` → returns `{ "authorId": 1, "text": "..." }`.
 
-### `POST /comments/{commentId}/like` and `DELETE /comments/{commentId}/like`
-Like / unlike. Both return:
+### `POST /comments/{commentId}/like?userId={id}` and `DELETE /comments/{commentId}/like?userId={id}`
+Like / unlike. Same no-auth reasoning as above — `userId` (always
+`CURRENT_USER_ID`) says who's doing the liking. Both return:
 ```json
 { "likeCount": 7, "likedByCurrentUser": true }
 ```

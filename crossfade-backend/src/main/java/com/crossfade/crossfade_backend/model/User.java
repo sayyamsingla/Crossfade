@@ -18,7 +18,14 @@ public class User {
     private String displayName;
     private String handle;
     private String bio;
+
+    @Column(length = 1000)
     private String avatarUrl;
+
+    @Column(unique = true)
+    private String spotifyUserId;
+
+    private boolean hasChosenHandle = false;
 
     @ManyToOne
     @JoinColumn(name = "now_playing_track_id")
