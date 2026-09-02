@@ -1,5 +1,6 @@
 package com.crossfade.crossfade_backend.service;
 
+import com.crossfade.crossfade_backend.kafka.KafkaFeedProducer;
 import com.crossfade.crossfade_backend.model.Follow;
 import com.crossfade.crossfade_backend.model.User;
 import com.crossfade.crossfade_backend.model.UserTopGenre;
@@ -9,6 +10,8 @@ import com.crossfade.crossfade_backend.repo.UserTopGenreRepository;
 import com.crossfade.crossfade_backend.response.FollowingResponse;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +31,7 @@ public class FriendsService {
     UserTopGenreRepository userTopGenreRepo;
 
     @Autowired
-    FeedService feedService;
+    KafkaFeedProducer kafkaFeedProducer;
 
     public List<FollowingResponse> getfollowing(Long id) {
         List<Follow> follows = repo.findByFollower_Id(id);
@@ -71,6 +74,10 @@ public class FriendsService {
         return result;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "userProfile", key = "#followerId"),
+            @CacheEvict(value = "userProfile", key = "#followeeId")
+    })
     public void follow(Long followerId, Long followeeId) {
         if (repo.existsByFollower_IdAndFollowee_Id(followerId, followeeId)) return;
 
@@ -85,9 +92,13 @@ public class FriendsService {
         f.setCreatedAt(Instant.now());
         repo.save(f);
 
-        feedService.recordFollow(follower, followee);
+        kafkaFeedProducer.publishUserFollowed(followerId, followeeId);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "userProfile", key = "#followerId"),
+            @CacheEvict(value = "userProfile", key = "#followeeId")
+    })
     @Transactional
     public void unfollow(Long followerId, Long followeeId) {
         repo.deleteByFollower_IdAndFollowee_Id(followerId, followeeId);

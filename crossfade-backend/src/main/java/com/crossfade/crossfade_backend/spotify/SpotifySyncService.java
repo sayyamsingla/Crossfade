@@ -28,6 +28,8 @@ import com.crossfade.crossfade_backend.response.SyncStatusResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -72,6 +74,15 @@ public class SpotifySyncService {
     private static final int MAX_SYNCS_PER_WINDOW = 3;
     private static final Duration SYNC_WINDOW = Duration.ofDays(7);
 
+
+    @Caching(evict = {
+            @CacheEvict(value = "userProfile", key = "#localUserId"),
+            @CacheEvict(value = "playlists", key = "#localUserId"),
+            @CacheEvict(value = "topTracks", allEntries = true),
+            @CacheEvict(value = "topArtists", allEntries = true),
+            @CacheEvict(value = "topGenres", allEntries = true),
+            @CacheEvict(value = "playlistTracks", allEntries = true)
+    })
     @Transactional
     public void syncUser(Long localUserId, Authentication authentication) {
         Instant windowStart = Instant.now().minus(SYNC_WINDOW);

@@ -1,5 +1,6 @@
 package com.crossfade.crossfade_backend.service;
 
+import com.crossfade.crossfade_backend.kafka.KafkaFeedProducer;
 import com.crossfade.crossfade_backend.model.Comment;
 import com.crossfade.crossfade_backend.model.CommentLike;
 import com.crossfade.crossfade_backend.model.Playlist;
@@ -23,6 +24,9 @@ import com.crossfade.crossfade_backend.repo.UserTopTrackRepository;
 import com.crossfade.crossfade_backend.response.*;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,10 +67,14 @@ public class ProfileService {
     PlaylistLikeRepository playlistLikeRepo;
 
     @Autowired
-    FeedService feedService;
+    KafkaFeedProducer kafkaFeedProducer;
+
+    @Autowired
+    @Lazy
+    private ProfileService self;
 
 
-
+    @Cacheable("userProfile")
     public UserProfileResponse getUserProfile(Long id) {
         User user = userRepo.findById(id).orElseThrow(() ->
                 new EntityNotFoundException("User Not Found " + id));
@@ -88,6 +96,8 @@ public class ProfileService {
         return response;
     }
 
+
+    @CacheEvict(value = "userProfile", key = "#userId")
     @Transactional
     public UserProfileResponse setHandle(Long userId, String rawHandle) {
         String handle = rawHandle == null ? "" : rawHandle.trim();
@@ -113,6 +123,7 @@ public class ProfileService {
 
     }
 
+    @Cacheable("topTracks")
     public List<TopTrackResponse> getUserTopTracks(Long id, String range, int limit) {
         List<UserTopTrack> topTracks = userTopTrackRepo.findByUser_IdOrderByRankAsc(id);
 
@@ -138,7 +149,7 @@ public class ProfileService {
 
 
     }
-
+    @Cacheable("topArtists")
     public List<TopArtistResponse> getUserTopArtists(Long id, String range, int limit) {
         List<UserTopArtist> topArtists = userTopArtistRepo.findByUser_IdOrderByRankAsc(id);
 
@@ -161,6 +172,7 @@ public class ProfileService {
         return result;
     }
 
+    @Cacheable("topGenres")
     public List<TopGenreResponse> getUserTopGenres(Long id, int limit) {
         List<UserTopGenre> topGenres = userTopGenreRepo.findByUser_IdOrderByPercentageDesc(id);
 
@@ -180,7 +192,8 @@ public class ProfileService {
         return result;
     }
 
-    public List<PlaylistResponse> getUserPlaylists(Long id, Long viewerId) {
+    @Cacheable("playlists")
+    public List<PlaylistResponse> getUserPlaylistsBase(Long id) {
         List<Playlist> playlists = playlistRepo.findByOwner_Id(id);
 
         List<PlaylistResponse> result = new ArrayList<>();
@@ -191,8 +204,6 @@ public class ProfileService {
             response.setTitle(playlist.getTitle());
             response.setTrackCount(playlistTrackRepo.countByPlaylist_Id(playlist.getId()));
             response.setCoverUrl(playlist.getCoverUrl());
-            response.setLikeCount(playlistLikeRepo.countByPlaylist_Id(playlist.getId()));
-            response.setLikedByCurrentUser(viewerId != null && playlistLikeRepo.existsByPlaylist_IdAndUser_Id(playlist.getId(), viewerId));
 
             result.add(response);
         }
@@ -200,6 +211,27 @@ public class ProfileService {
         return result;
     }
 
+    public List<PlaylistResponse> getUserPlaylists(Long id, Long viewerId) {
+        List<PlaylistResponse> base = self.getUserPlaylistsBase(id);
+
+        List<PlaylistResponse> result = new ArrayList<>();
+
+        for (PlaylistResponse cached : base) {
+            PlaylistResponse response = new PlaylistResponse();
+            response.setPlaylistId(cached.getPlaylistId());
+            response.setTitle(cached.getTitle());
+            response.setTrackCount(cached.getTrackCount());
+            response.setCoverUrl(cached.getCoverUrl());
+            response.setLikeCount(playlistLikeRepo.countByPlaylist_Id(cached.getPlaylistId()));
+            response.setLikedByCurrentUser(viewerId != null && playlistLikeRepo.existsByPlaylist_IdAndUser_Id(cached.getPlaylistId(), viewerId));
+
+            result.add(response);
+        }
+
+        return result;
+    }
+
+    @Cacheable("playlistTracks")
     public List<PlaylistTrackResponse> getPlaylistTracks(Long playlistId) {
         List<PlaylistTrack> playlistTracks = playlistTrackRepo.findByPlaylist_IdOrderByPositionAsc(playlistId);
 
@@ -230,9 +262,10 @@ public class ProfileService {
         comment.setCommentator(author);
         comment.setReceiver(receiver);
         comment.setCreatedAt(Instant.now());
+
         commentRepo.save(comment);
 
-        feedService.recordComment(author, receiver, text);
+        kafkaFeedProducer.publishCommentPosted(authorId, receiverId, text);
 
         return new PostCommentResponse(authorId, text);
     }
@@ -302,7 +335,7 @@ public class ProfileService {
             like.setPlaylist(playlist);
             like.setUser(user);
             playlistLikeRepo.save(like);
-            feedService.recordLikePlaylist(user, playlist);
+            kafkaFeedProducer.publishPlaylistLiked(userId, playlistId);
         }
 
         return new LikeResponse(playlistLikeRepo.countByPlaylist_Id(playlistId), true);

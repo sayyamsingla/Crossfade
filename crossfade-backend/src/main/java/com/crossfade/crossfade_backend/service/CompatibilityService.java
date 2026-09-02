@@ -1,10 +1,10 @@
 package com.crossfade.crossfade_backend.service;
 
 import com.crossfade.crossfade_backend.model.UserTopArtist;
-import com.crossfade.crossfade_backend.model.UserTopGenre;
+import com.crossfade.crossfade_backend.model.UserTopTrack;
 import com.crossfade.crossfade_backend.repo.UserRepository;
 import com.crossfade.crossfade_backend.repo.UserTopArtistRepository;
-import com.crossfade.crossfade_backend.repo.UserTopGenreRepository;
+import com.crossfade.crossfade_backend.repo.UserTopTrackRepository;
 import com.crossfade.crossfade_backend.response.CompatibilityResponse;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +22,13 @@ import static java.util.stream.Collectors.toMap;
 @Service
 public class CompatibilityService {
 
+    /**
+     * Only the top N ranked items count toward the score (and the shared-item
+     * lists), so a large synced history (top 50) doesn't dilute the union with
+     * rarely-listened tail entries.
+     */
+    private static final int MAX_COMPARE_ITEMS = 20;
+
     @Autowired
     UserRepository userRepo;
 
@@ -29,16 +36,20 @@ public class CompatibilityService {
     UserTopArtistRepository userTopArtistRepo;
 
     @Autowired
-    UserTopGenreRepository userTopGenreRepo;
+    UserTopTrackRepository userTopTrackRepo;
 
     public CompatibilityResponse getCompatibility(Long userId, Long withUserId) {
         userRepo.findById(userId).orElseThrow(() -> new EntityNotFoundException("User Not Found " + userId));
         userRepo.findById(withUserId).orElseThrow(() -> new EntityNotFoundException("User Not Found " + withUserId));
 
-        List<UserTopArtist> mine = userTopArtistRepo.findByUser_IdOrderByRankAsc(userId);
-        List<UserTopArtist> theirs = userTopArtistRepo.findByUser_IdOrderByRankAsc(withUserId);
-        List<UserTopGenre> myGenres = userTopGenreRepo.findByUser_IdOrderByPercentageDesc(userId);
-        List<UserTopGenre> theirGenres = userTopGenreRepo.findByUser_IdOrderByPercentageDesc(withUserId);
+        List<UserTopArtist> mine = userTopArtistRepo.findByUser_IdOrderByRankAsc(userId).stream()
+                .limit(MAX_COMPARE_ITEMS).toList();
+        List<UserTopArtist> theirs = userTopArtistRepo.findByUser_IdOrderByRankAsc(withUserId).stream()
+                .limit(MAX_COMPARE_ITEMS).toList();
+        List<UserTopTrack> myTracks = userTopTrackRepo.findByUser_IdOrderByRankAsc(userId).stream()
+                .limit(MAX_COMPARE_ITEMS).toList();
+        List<UserTopTrack> theirTracks = userTopTrackRepo.findByUser_IdOrderByRankAsc(withUserId).stream()
+                .limit(MAX_COMPARE_ITEMS).toList();
 
         Map<Long, Integer> myArtistRanks = mine.stream()
                 .collect(toMap(a -> a.getArtist().getId(), UserTopArtist::getRank, (a, b) -> a));
@@ -48,42 +59,61 @@ public class CompatibilityService {
         mine.forEach(a -> artistNames.put(a.getArtist().getId(), a.getArtist().getName()));
         theirs.forEach(a -> artistNames.putIfAbsent(a.getArtist().getId(), a.getArtist().getName()));
 
-        Set<Long> artistUnion = new HashSet<>(myArtistRanks.keySet());
-        artistUnion.addAll(theirArtistRanks.keySet());
-        Set<Long> sharedArtistIds = new HashSet<>(myArtistRanks.keySet());
-        sharedArtistIds.retainAll(theirArtistRanks.keySet());
-        double artistJaccard = artistUnion.isEmpty() ? 0.0 : (double) sharedArtistIds.size() / artistUnion.size();
+        OverlapResult artistOverlap = computeOverlap(myArtistRanks, theirArtistRanks, artistNames);
 
-        List<String> sharedArtists = sharedArtistIds.stream()
-                .sorted(Comparator.comparingInt(id -> Math.min(myArtistRanks.get(id), theirArtistRanks.get(id))))
-                .map(artistNames::get)
-                .toList();
+        Map<Long, Integer> myTrackRanks = myTracks.stream()
+                .collect(toMap(t -> t.getTrack().getId(), UserTopTrack::getRank, (a, b) -> a));
+        Map<Long, Integer> theirTrackRanks = theirTracks.stream()
+                .collect(toMap(t -> t.getTrack().getId(), UserTopTrack::getRank, (a, b) -> a));
+        Map<Long, String> trackTitles = new HashMap<>();
+        myTracks.forEach(t -> trackTitles.put(t.getTrack().getId(), t.getTrack().getTitle()));
+        theirTracks.forEach(t -> trackTitles.putIfAbsent(t.getTrack().getId(), t.getTrack().getTitle()));
 
-        Map<String, Integer> myGenreByKey = myGenres.stream()
-                .collect(toMap(g -> g.getGenreName().toLowerCase(), UserTopGenre::getPercentage, (a, b) -> a));
-        Map<String, Integer> theirGenreByKey = theirGenres.stream()
-                .collect(toMap(g -> g.getGenreName().toLowerCase(), UserTopGenre::getPercentage, (a, b) -> a));
-        Map<String, String> genreDisplayNames = new HashMap<>();
-        myGenres.forEach(g -> genreDisplayNames.put(g.getGenreName().toLowerCase(), g.getGenreName()));
-        theirGenres.forEach(g -> genreDisplayNames.putIfAbsent(g.getGenreName().toLowerCase(), g.getGenreName()));
+        OverlapResult trackOverlap = computeOverlap(myTrackRanks, theirTrackRanks, trackTitles);
 
-        Set<String> genreUnion = new HashSet<>(myGenreByKey.keySet());
-        genreUnion.addAll(theirGenreByKey.keySet());
-        Set<String> sharedGenreKeys = new HashSet<>(myGenreByKey.keySet());
-        sharedGenreKeys.retainAll(theirGenreByKey.keySet());
-        double genreJaccard = genreUnion.isEmpty() ? 0.0 : (double) sharedGenreKeys.size() / genreUnion.size();
-
-        List<String> sharedGenres = sharedGenreKeys.stream()
-                .sorted(Comparator.<String>comparingInt(k -> myGenreByKey.get(k) + theirGenreByKey.get(k)).reversed())
-                .map(genreDisplayNames::get)
-                .toList();
-
-        int score = (int) Math.round((artistJaccard * 0.5 + genreJaccard * 0.5) * 100);
+        int score = (int) Math.round((artistOverlap.similarity() * 0.6 + trackOverlap.similarity() * 0.4) * 100);
         boolean noData = myArtistRanks.isEmpty() && theirArtistRanks.isEmpty()
-                && myGenreByKey.isEmpty() && theirGenreByKey.isEmpty();
+                && myTrackRanks.isEmpty() && theirTrackRanks.isEmpty();
         String caption = buildCaption(score, noData);
 
-        return new CompatibilityResponse(score, caption, sharedArtists, sharedGenres);
+        return new CompatibilityResponse(score, caption, artistOverlap.shared(), trackOverlap.shared());
+    }
+
+    private record OverlapResult(double similarity, List<String> shared) {}
+
+    /**
+     * Rank-weighted overlap (Ruzicka similarity): each ranked item gets a
+     * weight of (MAX_COMPARE_ITEMS - rank + 1), so a #1 pick counts far more
+     * than a #20 pick. Similarity is sum(min(weights)) / sum(max(weights))
+     * across the union, which reduces to plain Jaccard if every present item
+     * had the same weight, but here rewards overlap more when it's ranked
+     * highly on both sides.
+     */
+    private OverlapResult computeOverlap(Map<Long, Integer> myRanks, Map<Long, Integer> theirRanks, Map<Long, String> names) {
+        Set<Long> union = new HashSet<>(myRanks.keySet());
+        union.addAll(theirRanks.keySet());
+
+        double sumMin = 0;
+        double sumMax = 0;
+        for (Long id : union) {
+            double myWeight = weightForRank(myRanks.get(id));
+            double theirWeight = weightForRank(theirRanks.get(id));
+            sumMin += Math.min(myWeight, theirWeight);
+            sumMax += Math.max(myWeight, theirWeight);
+        }
+        double similarity = sumMax == 0 ? 0.0 : sumMin / sumMax;
+
+        List<String> shared = union.stream()
+                .filter(id -> myRanks.containsKey(id) && theirRanks.containsKey(id))
+                .sorted(Comparator.comparingInt(id -> Math.min(myRanks.get(id), theirRanks.get(id))))
+                .map(names::get)
+                .toList();
+
+        return new OverlapResult(similarity, shared);
+    }
+
+    private double weightForRank(Integer rank) {
+        return rank == null ? 0.0 : MAX_COMPARE_ITEMS - rank + 1;
     }
 
     private String buildCaption(int score, boolean noData) {

@@ -13,5 +13,5 @@ public class CompatibilityResponse {
     private int score;
     private String caption;
     private List<String> sharedArtists;
-    private List<String> sharedGenres;
+    private List<String> sharedTracks;
 }

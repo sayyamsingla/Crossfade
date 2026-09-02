@@ -660,5 +660,5 @@ function renderCompat(data, withUserId) {
   document.getElementById('faderCap').style.left = `${50 + lean}%`;
 
   document.getElementById('sharedArtists').innerHTML = (data.sharedArtists || []).map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') || '<span class="empty-note">No overlap found.</span>';
-  document.getElementById('sharedGenres').innerHTML = (data.sharedGenres || []).map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('') || '<span class="empty-note">No overlap found.</span>';
+  document.getElementById('sharedTracks').innerHTML = (data.sharedTracks || []).map(t => `<span class="chip">${escapeHtml(t)}</span>`).join('') || '<span class="empty-note">No overlap found.</span>';
 }

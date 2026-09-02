@@ -195,9 +195,9 @@
   const ALL_PEOPLE = Object.values(USERS).map(u => ({ userId: u.id, displayName: u.displayName, avatarUrl: u.avatarUrl, topGenre: u.topGenre }));
 
   const COMPATIBILITY = {
-    '1:2': { score: 74, caption: 'You and Jordan share a lot of the same lane — mostly overlapping in indie pop and dream pop.', sharedArtists: ['Phoebe Bridgers', 'MGMT', 'Beach House'], sharedGenres: ['Indie Pop', 'Bedroom Pop', 'Dream Pop'] },
-    '1:3': { score: 38, caption: 'A little overlap in dream pop, but Alex leans a lot heavier into shoegaze than you do.', sharedArtists: ['Beach House'], sharedGenres: ['Dream Pop'] },
-    '1:4': { score: 21, caption: 'Not much crossover — Priya is deep in house and IDM, pretty different lane from yours.', sharedArtists: [], sharedGenres: [] },
+    '1:2': { score: 74, caption: 'You and Jordan share a lot of the same lane — mostly overlapping in indie pop and dream pop.', sharedArtists: ['Phoebe Bridgers', 'MGMT', 'Beach House'], sharedTracks: ['Motion Sickness'] },
+    '1:3': { score: 38, caption: 'A little overlap in dream pop, but Alex leans a lot heavier into shoegaze than you do.', sharedArtists: ['Beach House'], sharedTracks: [] },
+    '1:4': { score: 21, caption: 'Not much crossover — Priya is deep in house and IDM, pretty different lane from yours.', sharedArtists: [], sharedTracks: [] },
   };
 
   const delay = (ms = 220) => new Promise(res => setTimeout(res, ms));
@@ -285,7 +285,7 @@
     async getCompatibility(userId, withUserId) {
       await delay();
       return COMPATIBILITY[`${userId}:${withUserId}`] || COMPATIBILITY[`${withUserId}:${userId}`] || {
-        score: 50, caption: 'Not enough shared listening history yet.', sharedArtists: [], sharedGenres: [],
+        score: 50, caption: 'Not enough shared listening history yet.', sharedArtists: [], sharedTracks: [],
       };
     },
   };
