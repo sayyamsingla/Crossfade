@@ -11,6 +11,30 @@ Crossfade is a social app for people who care about music. You log in with Spoti
 - Auth: Spotify OAuth2
 - Frontend: plain HTML, CSS, and JavaScript, no framework, no build step
 
+## Running it locally
+
+Needs Java 25, a running MySQL instance, Redis, and a Kafka broker.
+
+Environment variables the backend reads:
+
+- `DB_USERNAME` (defaults to `root`)
+- `DB_PASSWORD` (required, no default)
+- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`, from a Spotify developer app with `http://127.0.0.1:8080/login/oauth2/code/spotify` registered as a redirect URI
+- `FRONTEND_BASE_URL` (defaults to `http://127.0.0.1:5173`)
+
+```bash
+cd crossfade-backend
+./mvnw spring-boot:run
+```
+Runs on `http://localhost:8080` against a MySQL database named `wavelength` (left over from before the project was renamed), a Redis instance on `localhost:6379`, and Kafka on `localhost:9092`. The schema updates itself on startup (`ddl-auto=update`), and `data.sql` reseeds a fixed set of test users every time the app restarts.
+
+```bash
+cd crossfade-frontend
+npm install
+npm start
+```
+Runs on `http://localhost:5173`. The backend's CORS config only allows that origin, so serving the frontend from anywhere else will fail silently in the browser even though curl works fine.
+
 ## Architecture overview
 
 ### Data model
@@ -45,7 +69,7 @@ Follows, comments, and playlist likes get published to a Kafka topic, `feed-even
 
 ## API reference
 
-All endpoints are prefixed with `/api`. Endpoints marked with a lock require the user to be logged in.
+All endpoints are prefixed with `/api` and return JSON. Endpoints marked with a lock require the user to be logged in via the Spotify OAuth2 session cookie, not a bearer token, since there's no separate API auth layer.
 
 ### Profile
 
