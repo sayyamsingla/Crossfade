@@ -1,113 +1,51 @@
 # Crossfade
 
-Crossfade is a social app for people who care about music. You connect your
-Spotify account, and the app pulls your top tracks, top artists, and top
-genres to build a profile of your taste. From there you can follow other
-users, see a compatibility score that measures how closely your music taste
-overlaps with theirs, comment on and like each other's playlists, and see a
-feed of what the people you follow are doing.
-
-The idea behind the project was to build something that actually needed a
-real backend, not just a CRUD app. Compatibility scoring needed an actual
-algorithm instead of a simple lookup. Syncing Spotify data needed retry
-handling and rate limiting because Spotify's API can reject requests.
-Repeated profile lookups needed caching so the database wasn't hit on every
-request. A feed of follow, comment, and like events needed something that
-could handle events without blocking the request that triggered them. Those
-requirements are what shaped the backend design below.
-
-## Why this exists
-
-Most portfolio projects are simple enough that a single service and a single
-database table can handle everything. This project was built specifically to
-avoid that. Every piece of infrastructure here (Redis, Kafka, OAuth2, a
-custom caching layer) was added because a real requirement needed it, not
-because it looks good on a resume. The sections below explain what each
-piece is doing and why it's there.
+Crossfade is a social app for people who care about music. You log in with Spotify, and it pulls your top tracks, top artists, and top genres to build a profile of your taste. From there you can follow other users, get a compatibility score against them, comment on and like each other's playlists, and check a feed of what the people you follow are doing.
 
 ## Tech stack
 
-- **Backend:** Java, Spring Boot, Spring Data JPA, Spring Security
-- **Database:** MySQL
-- **Caching:** Caffeine (in memory) and Redis (shared, persists across
-  restarts)
-- **Messaging:** Kafka
-- **Auth:** Spotify OAuth2
-- **Frontend:** Plain HTML, CSS, and JavaScript with no framework or build
-  step
+- Backend: Java, Spring Boot, Spring Data JPA, Spring Security
+- Database: MySQL
+- Caching: Caffeine (in memory) and Redis (shared, survives restarts)
+- Messaging: Kafka
+- Auth: Spotify OAuth2
+- Frontend: plain HTML, CSS, and JavaScript, no framework, no build step
 
 ## Architecture overview
 
 ### Data model
 
-The schema is built with Spring Data JPA across 20 entities. Most
-many to many relationships (playlist tracks, a user's top artists, a user's
-top tracks) are modeled as their own entities with composite keys instead of
-plain join tables, because each of those relationships carries its own data
-like rank or track position, not just a link between two rows.
+The schema runs across 20 JPA entities. Seven of them are junction tables built with `@IdClass` instead of a generated id: `Follow` (follower id plus followee id), `PlaylistTrack` (playlist plus track plus position), `UserTopArtist` and `UserTopTrack` (user plus artist or track plus rank), `UserTopGenre` (user plus genre name plus percentage), and `CommentLike`/`PlaylistLike` (comment or playlist plus user). Rank and position needed somewhere to live, so those relationships became entities instead of plain join tables.
 
-A few relationships needed two separate foreign keys to the same entity
-instead of one. A follow has a follower and a followee, and those are two
-different users playing two different roles in the same row. A comment has
-an author and a recipient for the same reason. Modeling these as a single
-ambiguous relationship would have made the two roles impossible to tell
-apart.
+`Follow` and `Comment` each carry two foreign keys to `User` instead of one. A follow has a follower and a followee, and a comment has an author and a recipient, and those are two different roles on the same row. Collapsing that into a single relationship would make it impossible to tell which user is which.
 
-Fields that can be computed from existing data, like a user's follower
-count or a playlist's track count, are not stored as columns. They're
-computed at query time so there's no risk of that number drifting out of
-sync with the rows it's counting.
+Derived fields like a user's follower count, following count, and a playlist's track count aren't columns. `ProfileService` computes them at read time so they can't drift out of sync with the rows they're counting.
 
 ### Authentication
 
-Login happens through Spotify OAuth2, handled by Spring Security. On a
-user's first login, the app creates a local user record and links it to
-their Spotify account, so every user in the system maps back to a real
-Spotify identity. Access and refresh tokens are stored in MySQL instead of
-in memory, so a user doesn't have to log in again if the server restarts.
+Login goes through Spotify OAuth2 via Spring Security. `SpotifyOAuth2UserService` handles provisioning: on first login it looks up the Spotify user id, and if there's no match, it creates a local `User` row right there. `CrossfadeOAuth2User` wraps the raw OAuth2 user object and carries the local user id alongside it, so the rest of the app can go from a Spotify identity to a local one without an extra lookup.
+
+Tokens don't sit in Spring's default in-memory client service. `OAuth2ClientConfig` swaps in `JdbcOAuth2AuthorizedClientService`, which persists access and refresh tokens in MySQL, so a server restart doesn't force everyone to log back in.
 
 ### Caching
 
-Profile lookups, top tracks, top artists, and playlists are all read far
-more often than they're written, so those endpoints are cached. Caching
-runs in two tiers. The first tier is Caffeine, an in memory cache that's
-extremely fast but disappears if the server restarts. The second tier is
-Redis, which is slower than in memory access but holds onto data across
-restarts. A read checks Caffeine first, falls back to Redis on a miss, and
-if Redis has the value, it gets written back into Caffeine so the next read
-is fast again. This means a server restart doesn't force every user's data
-to be rebuilt from the database from scratch.
+`userProfile`, `topTracks`, `topArtists`, `topGenres`, `playlists`, and `playlistTracks` all go through a two-tier cache manager, `TwoLevelCacheManager`. Caffeine sits in front as L1: in memory, fast, gone on restart. Redis sits behind it as L2, serialized with `GenericJacksonJsonRedisSerializer` with default typing turned on, so a read comes back as the actual DTO instead of a `LinkedHashMap`. A lookup checks L1 first, falls back to L2 on a miss, and writes that value back into L1 so the next read is fast again. Both tiers share a 10 hour TTL, and evictions go through both, so a cache invalidation from a sync or a follow can't leave a stale copy sitting in Redis after Caffeine's copy is already gone.
 
 ### Compatibility scoring
 
-The compatibility score between two users is not a static value pulled from
-a table. It's calculated by comparing each user's top 20 artists and top 20
-tracks, weighting shared entries by how highly each user ranks them, and
-combining the artist and track overlap into a single score from 0 to 100.
-Two users who both rank the same artist near the top of their list score
-higher than two users who share an artist that's low on both lists.
+`CompatibilityService` compares each user's top 20 artists and top 20 tracks with a rank-weighted Ruzicka similarity. A shared item's weight is `MAX_COMPARE_ITEMS` minus its rank plus one, so an artist both people rank near the top counts for a lot more than one buried near the bottom. Artist similarity and track similarity are computed separately, then combined as `artistSim * 0.6 + trackSim * 0.4` and rounded into a score from 0 to 100.
 
 ### Spotify sync
 
-A background sync pipeline pulls a user's profile, top tracks, top artists,
-and playlists from the Spotify Web API. Spotify's API returns a rate limit
-error if too many requests come in too quickly, so the sync includes retry
-logic that reads the response headers Spotify sends back and waits the
-correct amount of time before trying again instead of failing outright.
+`SpotifySyncService` pulls a user's profile, top 50 artists, top genres (derived by counting genre tags across those artists), top 50 tracks, and up to 100 tracks per playlist, all inside one `@Transactional` method. `SpotifyApiClient` handles the retries: on a 429 it reads the `Retry-After` header, clamps it between 1 and 5 seconds, and retries up to twice. Syncs are also capped at 3 per user per 7 day sliding window, tracked through `SyncLogRepository`, so a user can't hammer the endpoint and eat into Spotify's rate limit.
 
 ### Feed and Kafka
 
-Following someone, commenting, and liking a playlist all publish an event
-to Kafka instead of writing directly to the feed table in the same request.
-A separate consumer picks up those events and writes them to the feed
-table. This keeps the action a user actually triggered, like following
-someone, fast and free of any dependency on feed processing. If feed
-writing were slow or failed, it wouldn't block or fail the follow itself.
+Follows, comments, and playlist likes get published to a Kafka topic, `feed-events`, instead of writing to the feed table inline. `KafkaFeedProducer` publishes three event types, `FOLLOWED`, `LIKED_PLAYLIST`, and `COMMENTED`, keyed by the actor's user id so one user's events stay in order within a partition. The topic has 3 partitions, and `KafkaFeedConsumer` runs with concurrency 3 to match it, one listener thread per partition. `FeedService` then reads back a merged feed with a single `IN` query across all followee ids instead of one query per followee.
 
 ## API reference
 
-All endpoints are prefixed with `/api`. Endpoints marked with a lock
-require the user to be logged in.
+All endpoints are prefixed with `/api`. Endpoints marked with a lock require the user to be logged in.
 
 ### Profile
 
@@ -164,7 +102,4 @@ require the user to be logged in.
 
 ## Frontend
 
-The frontend is a plain HTML, CSS, and JavaScript app with no framework and
-no build step. It calls the endpoints listed above directly and renders the
-responses. There's no separate frontend architecture to document since it's
-just static files talking to the API.
+The frontend is plain HTML, CSS, and JavaScript, no framework, no build step. It calls the endpoints above directly and renders the responses.
