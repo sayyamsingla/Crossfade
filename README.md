@@ -13,7 +13,12 @@ Crossfade is a social app for people who care about music. You log in with Spoti
 
 ## Running it locally
 
-Needs Java 25, a running MySQL instance, Redis, and a Kafka broker.
+Needs Java 25 plus MySQL, Redis, and Kafka. `docker-compose.yml` at the repo root brings up all three:
+
+```bash
+DB_PASSWORD=yourpassword docker compose up -d
+```
+This starts MySQL on `3306` with a `wavelength` database already created, Redis on `6379`, and a single-node Kafka broker (KRaft mode, no Zookeeper) on `9092`.
 
 Environment variables the backend reads:
 
