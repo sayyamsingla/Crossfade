@@ -4,7 +4,7 @@ Crossfade is a social app for people who care about music. You log in with Spoti
 
 ## Demo
 
-https://github.com/user-attachments/assets/cec3c48e-4cfe-43a4-8eb8-d66c420df474
+https://github.com/user-attachments/assets/54990cdf-54cc-4a60-957c-29da1bc8f27f
 
 ## Tech stack
 
