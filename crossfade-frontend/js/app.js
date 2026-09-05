@@ -215,7 +215,8 @@ async function loadProfilePage() {
   loadSection(() => Api.getNowPlaying(userId).then(renderNowPlaying), 'nowPlayingStrip');
   loadSection(() => Api.getTopTracks(userId).then(renderTracks), 'tracksList');
   loadSection(() => Api.getTopArtists(userId).then(renderArtists), 'artistGrid');
-  loadSection(() => Api.getTopGenres(userId).then(renderGenres), 'genreList');
+  // top genres hidden from profile, backend endpoint still in use elsewhere
+  // loadSection(() => Api.getTopGenres(userId).then(renderGenres), 'genreList');
   loadSection(() => Api.getPlaylists(userId).then(renderPlaylists), 'playlistGrid');
   loadSection(() => Api.getComments(userId).then(renderComments), 'commentList');
 
@@ -232,7 +233,8 @@ function renderHero(p) {
   document.getElementById('heroHandle').textContent = p.handle || '';
   document.getElementById('heroFollowers').textContent = (p.followersCount ?? 0).toLocaleString();
   document.getElementById('heroFollowing').textContent = (p.followingCount ?? 0).toLocaleString();
-  document.getElementById('heroTopGenre').textContent = p.topGenre || '—';
+  // top genre stat hidden from profile, backend field still in use elsewhere
+  // document.getElementById('heroTopGenre').textContent = p.topGenre || '—';
   const bioEl = document.getElementById('heroBio');
   if (p.bio) { bioEl.textContent = p.bio; bioEl.style.display = 'block'; } else { bioEl.style.display = 'none'; }
 
@@ -277,10 +279,10 @@ function renderNowPlaying(data) {
   `;
 }
 
-function renderTracks(tracks) {
-  const el = document.getElementById('tracksList');
-  if (!tracks || !tracks.length) { el.innerHTML = '<p class="empty-note">No top tracks yet.</p>'; return; }
-  el.innerHTML = tracks.map(t => `
+const TRACKS_COLLAPSED_COUNT = 5;
+
+function trackRowHtml(t) {
+  return `
     <div class="track-row">
       <div class="track-rank mono">${t.rank}</div>
       <div class="track-cover">${mediaTag({ url: t.coverUrl, name: t.title, seed: t.trackId })}</div>
@@ -289,7 +291,31 @@ function renderTracks(tracks) {
         <div class="track-artist">${escapeHtml(t.artist)}</div>
       </div>
     </div>
-  `).join('');
+  `;
+}
+
+function renderTracks(tracks) {
+  const el = document.getElementById('tracksList');
+  if (!tracks || !tracks.length) { el.innerHTML = '<p class="empty-note">No top tracks yet.</p>'; return; }
+
+  const visible = tracks.slice(0, TRACKS_COLLAPSED_COUNT).map(trackRowHtml).join('');
+  const rest = tracks.slice(TRACKS_COLLAPSED_COUNT).map(trackRowHtml).join('');
+
+  if (!rest) { el.innerHTML = visible; return; }
+
+  el.innerHTML = `
+    <div id="tracksVisible">${visible}</div>
+    <div id="tracksExtra" style="display:none;">${rest}</div>
+    <button type="button" id="tracksToggleBtn" class="tracks-toggle-btn">Show ${tracks.length - TRACKS_COLLAPSED_COUNT} more</button>
+  `;
+
+  const extra = document.getElementById('tracksExtra');
+  const toggleBtn = document.getElementById('tracksToggleBtn');
+  toggleBtn.addEventListener('click', () => {
+    const expanded = extra.style.display !== 'none';
+    extra.style.display = expanded ? 'none' : 'block';
+    toggleBtn.textContent = expanded ? `Show ${tracks.length - TRACKS_COLLAPSED_COUNT} more` : 'Show less';
+  });
 }
 
 function renderArtists(artists) {
@@ -314,12 +340,11 @@ function renderGenres(genres) {
   `).join('');
 }
 
-function renderPlaylists(playlists) {
-  const el = document.getElementById('playlistGrid');
-  if (!playlists || !playlists.length) { el.innerHTML = '<p class="empty-note">No playlists yet.</p>'; return; }
-  el.innerHTML = playlists.map(p => {
-    playlistCache[p.playlistId] = p;
-    return `
+const PLAYLISTS_COLLAPSED_COUNT = 5;
+
+function playlistCardHtml(p) {
+  playlistCache[p.playlistId] = p;
+  return `
     <div class="playlist-card" data-playlist-id="${p.playlistId}">
       <button class="playlist-cover-btn" onclick="openPlaylist(${p.playlistId})" aria-label="Open ${escapeHtml(p.title)}">
         <div class="playlist-cover">${mediaTag({ url: p.coverUrl, name: p.title, seed: p.playlistId })}</div>
@@ -337,7 +362,33 @@ function renderPlaylists(playlists) {
       </div>
     </div>
   `;
-  }).join('');
+}
+
+function renderPlaylists(playlists) {
+  const el = document.getElementById('playlistGrid');
+  if (!playlists || !playlists.length) { el.innerHTML = '<p class="empty-note">No playlists yet.</p>'; return; }
+
+  if (playlists.length <= PLAYLISTS_COLLAPSED_COUNT) {
+    el.innerHTML = playlists.map(playlistCardHtml).join('');
+    return;
+  }
+
+  const visible = playlists.slice(0, PLAYLISTS_COLLAPSED_COUNT).map(playlistCardHtml).join('');
+  const rest = playlists.slice(PLAYLISTS_COLLAPSED_COUNT).map(playlistCardHtml).join('');
+
+  el.innerHTML = `
+    <div id="playlistsVisible" class="playlist-grid">${visible}</div>
+    <div id="playlistsExtra" class="playlist-grid" style="display:none;">${rest}</div>
+    <button type="button" id="playlistsToggleBtn" class="playlists-toggle-btn">See all ${playlists.length} playlists</button>
+  `;
+
+  const extra = document.getElementById('playlistsExtra');
+  const toggleBtn = document.getElementById('playlistsToggleBtn');
+  toggleBtn.addEventListener('click', () => {
+    const expanded = extra.style.display !== 'none';
+    extra.style.display = expanded ? 'none' : 'grid';
+    toggleBtn.textContent = expanded ? `See all ${playlists.length} playlists` : 'Show less';
+  });
 }
 
 const playlistCache = {};

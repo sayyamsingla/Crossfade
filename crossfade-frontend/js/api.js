@@ -82,10 +82,10 @@ const RealApi = {
   getNowPlaying(userId) {
     return apiFetch(`/users/${userId}/now-playing`);
   },
-  getTopTracks(userId, { range = '4weeks', limit = 5 } = {}) {
+  getTopTracks(userId, { range = '4weeks', limit = 20 } = {}) {
     return apiFetch(`/users/${userId}/top-tracks?range=${range}&limit=${limit}`);
   },
-  getTopArtists(userId, { range = '4weeks', limit = 6 } = {}) {
+  getTopArtists(userId, { range = '4weeks', limit = 10 } = {}) {
     return apiFetch(`/users/${userId}/top-artists?range=${range}&limit=${limit}`);
   },
   getTopGenres(userId, { limit = 5 } = {}) {

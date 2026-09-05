@@ -71,7 +71,8 @@ public class CompatibilityService {
 
         OverlapResult trackOverlap = computeOverlap(myTrackRanks, theirTrackRanks, trackTitles);
 
-        int score = (int) Math.round((artistOverlap.similarity() * 0.6 + trackOverlap.similarity() * 0.4) * 100);
+        double rawSimilarity = artistOverlap.similarity() * 0.6 + trackOverlap.similarity() * 0.4;
+        int score = (int) Math.round(Math.pow(rawSimilarity, 0.5) * 100);
         boolean noData = myArtistRanks.isEmpty() && theirArtistRanks.isEmpty()
                 && myTrackRanks.isEmpty() && theirTrackRanks.isEmpty();
         String caption = buildCaption(score, noData);

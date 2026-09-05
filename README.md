@@ -2,6 +2,10 @@
 
 Crossfade is a social app for people who care about music. You log in with Spotify, and it pulls your top tracks, top artists, and top genres to build a profile of your taste. From there you can follow other users, get a compatibility score against them, comment on and like each other's playlists, and check a feed of what the people you follow are doing.
 
+## Demo
+
+[crossfade-demo.mp4](crossfade-demo.mp4)
+
 ## Tech stack
 
 - Backend: Java, Spring Boot, Spring Data JPA, Spring Security
@@ -18,7 +22,7 @@ Needs Java 25 plus MySQL, Redis, and Kafka. `docker-compose.yml` at the repo roo
 ```bash
 DB_PASSWORD=yourpassword docker compose up -d
 ```
-This starts MySQL on `3306` with a `wavelength` database already created, Redis on `6379`, and a single-node Kafka broker (KRaft mode, no Zookeeper) on `9092`.
+This starts MySQL on `3306` with a `crossfade` database already created, Redis on `6379`, and a single-node Kafka broker (KRaft mode, no Zookeeper) on `9092`.
 
 Environment variables the backend reads:
 
@@ -31,7 +35,7 @@ Environment variables the backend reads:
 cd crossfade-backend
 ./mvnw spring-boot:run
 ```
-Runs on `http://localhost:8080` against a MySQL database named `wavelength` (left over from before the project was renamed), a Redis instance on `localhost:6379`, and Kafka on `localhost:9092`. The schema updates itself on startup (`ddl-auto=update`), and `data.sql` reseeds a fixed set of test users every time the app restarts.
+Runs on `http://localhost:8080` against a MySQL database named `crossfade`, a Redis instance on `localhost:6379`, and Kafka on `localhost:9092`. The schema updates itself on startup (`ddl-auto=update`), and `data.sql` reseeds a fixed set of test users every time the app restarts.
 
 ```bash
 cd crossfade-frontend

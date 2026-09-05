@@ -28,5 +28,8 @@ crossfade-backend/src/main/resources/application-local.properties
 ### Local-only project notes ###
 CLAUDE.md
 
+### Original (uncompressed) demo recording — compressed crossfade-demo.mp4 is what's committed ###
+Crossfade Demo.mov
+
 ### Editors ###
 .vscode/

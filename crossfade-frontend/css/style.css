@@ -267,12 +267,37 @@ section.block { padding: 34px 0; border-top: 1px solid var(--line); }
 .track-name { font-size: 14px; font-weight: 600; }
 .track-artist { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
 
-/* ---- artist grid ---- */
-.artist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 16px; }
-.artist-card { text-align: left; }
+/* ---- artist grid: scrolls sideways so up to 10 fit without wrapping ---- */
+.artist-grid { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 4px; }
+.artist-card { text-align: left; width: 90px; flex-shrink: 0; }
 .artist-swatch { width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--surface-hi); }
 .artist-name { font-size: 12px; font-weight: 600; margin-top: 8px; display: flex; gap: 7px; }
 .artist-name .rk { color: var(--text-muted); font-family: var(--font-mono); font-weight: 500; flex-shrink: 0; }
+
+/* ---- top tracks show more/less toggle ---- */
+.tracks-toggle-btn {
+  margin-top: 10px; background: none; border: 1px solid var(--line); color: var(--text-secondary);
+  font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+}
+.tracks-toggle-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+.tracks-toggle-btn:focus-visible { outline: none; }
+
+/* ---- playlists show all toggle ----
+   #playlistGrid is itself a grid container, so the visible/extra wrapper
+   divs and the toggle button need to span every column instead of becoming
+   grid items squeezed into a single cell. The outer grid's own 16px gap
+   would otherwise stack on top of the button's margin, so it's zeroed out
+   here and spacing is set explicitly instead. */
+#playlistGrid:has(#playlistsToggleBtn) { gap: 0; }
+#playlistsVisible, #playlistsExtra, #playlistsToggleBtn { grid-column: 1 / -1; }
+#playlistsVisible, #playlistsExtra { margin-bottom: 16px; }
+.playlists-toggle-btn {
+  margin-top: 0; background: none; border: 1px solid var(--line); color: var(--text-secondary);
+  font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  justify-self: start;
+}
+.playlists-toggle-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+.playlists-toggle-btn:focus-visible { outline: none; }
 
 /* ---- top genres: a plain ranked list, no meter bar ---- */
 .genre-wrap { display: flex; flex-direction: column; }
