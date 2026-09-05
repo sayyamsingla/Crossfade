@@ -6,6 +6,8 @@ Crossfade is a social app for people who care about music. You log in with Spoti
 
 https://github.com/user-attachments/assets/54990cdf-54cc-4a60-957c-29da1bc8f27f
 
+This isn't deployed anywhere public. Spotify's API caps a development-mode app at 5 allowlisted users, so wider access needs Spotify to approve an extended quota request first.
+
 ## Tech stack
 
 - Backend: Java, Spring Boot, Spring Data JPA, Spring Security
